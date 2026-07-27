@@ -1,0 +1,29 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+out
+next-env.d.ts
+*.tsbuildinfo
+
+# env
+.env*
+
+# os / editor
+.DS_Store
+*.log
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# copied from pdfjs-dist by the postinstall script
+/public/pdf.min.mjs
+/public/pdf.worker.min.mjs
+
+# your own data and the resumes you generate — keep these out of the repo
+*.json.bak
+my-resume-data.json
+*.pdf
+*.tex

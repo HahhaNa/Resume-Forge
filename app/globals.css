@@ -1,0 +1,473 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Warm paper / cool ink. Four same-chroma variant hues (hw 45, ml 300, sw 215, tw 150)
+   carry meaning across every screen, so a tag reads the same in a bullet, a tab and a chart. */
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --plane: #f4f2ee;
+  --surface: #ffffff;
+  --raise: #faf8f4;
+  --sunken: #f8f6f2;
+  --chip: #f4f2ee;
+  --chip-hover: #ece8e0;
+  --track: #f1eee8;
+
+  /* ink */
+  --ink: #191817;
+  --ink2: #6c675f;
+  --muted: #a09a90;
+  --faint: #b3ada2;
+
+  /* lines */
+  --ring: #e7e3db;
+  --grid: #efece5;
+  --axis: #e2ddd3;
+  --card-line: transparent;
+
+  /* elevation — light carries depth in shadow, dark carries it in the border */
+  --lift: 0 1px 2px rgba(24, 22, 20, 0.05);
+  --lift-2: 0 1px 2px rgba(24, 22, 20, 0.05), 0 12px 28px -22px rgba(24, 22, 20, 0.45);
+  --lift-3: 0 1px 2px rgba(24, 22, 20, 0.06), 0 18px 40px -28px rgba(24, 22, 20, 0.6);
+
+  /* accent */
+  --accent: oklch(0.55 0.17 264);
+  --accent-hi: oklch(0.48 0.17 264);
+  --accent-ink: oklch(0.5 0.16 264);
+  --accent-soft: oklch(0.968 0.022 264);
+  --accent-line: oklch(0.9 0.05 264);
+
+  /* variant hues */
+  --hw: oklch(0.62 0.15 45);
+  --hw-ink: oklch(0.5 0.13 45);
+  --hw-soft: oklch(0.955 0.035 45);
+  --hw-tint: oklch(0.965 0.025 45);
+  --hw-line: oklch(0.88 0.06 45);
+
+  --ml: oklch(0.58 0.16 300);
+  --ml-ink: oklch(0.47 0.15 300);
+  --ml-soft: oklch(0.96 0.03 300);
+  --ml-tint: oklch(0.975 0.018 300);
+  --ml-line: oklch(0.87 0.06 300);
+
+  --sw: oklch(0.58 0.13 215);
+  --sw-ink: oklch(0.45 0.11 215);
+  --sw-soft: oklch(0.955 0.03 215);
+  --sw-tint: oklch(0.975 0.015 215);
+  --sw-line: oklch(0.86 0.05 215);
+
+  --tw: oklch(0.56 0.13 150);
+  --tw-ink: oklch(0.44 0.11 150);
+  --tw-soft: oklch(0.95 0.035 150);
+  --tw-tint: oklch(0.973 0.018 150);
+  --tw-line: oklch(0.86 0.06 150);
+
+  /* semantic */
+  --good: oklch(0.5 0.13 150);
+  --warn: oklch(0.62 0.15 70);
+  --serious: oklch(0.58 0.16 40);
+  --crit: oklch(0.55 0.19 25);
+
+  /* legacy series slots — Platform.color persists "s1".."s6", so these ids must survive */
+  --s1: var(--accent);
+  --s2: var(--hw);
+  --s3: var(--tw);
+  --s4: var(--warn);
+  --s5: var(--ml);
+  --s6: var(--sw);
+  --o1: oklch(0.86 0.05 264);
+  --o2: oklch(0.74 0.1 264);
+  --o3: oklch(0.64 0.14 264);
+  --o4: oklch(0.55 0.17 264);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+
+    --plane: oklch(0.16 0.012 265);
+    --surface: oklch(0.215 0.014 265);
+    --raise: oklch(0.235 0.014 265);
+    --sunken: oklch(0.19 0.012 265);
+    --chip: oklch(0.26 0.014 265);
+    --chip-hover: oklch(0.31 0.014 265);
+    --track: oklch(0.27 0.014 265);
+
+    --ink: oklch(0.97 0.006 265);
+    --ink2: oklch(0.8 0.012 265);
+    --muted: oklch(0.6 0.014 265);
+    --faint: oklch(0.5 0.014 265);
+
+    --ring: oklch(0.28 0.016 265);
+    --grid: oklch(0.26 0.016 265);
+    --axis: oklch(0.31 0.016 265);
+    --card-line: oklch(0.27 0.014 265);
+
+    --lift: none;
+    --lift-2: none;
+    --lift-3: 0 18px 40px -28px #000;
+
+    --accent: oklch(0.72 0.15 264);
+    --accent-hi: oklch(0.78 0.14 264);
+    --accent-ink: oklch(0.78 0.13 264);
+    --accent-soft: oklch(0.28 0.06 264);
+    --accent-line: oklch(0.42 0.09 264);
+
+    --hw: oklch(0.78 0.14 55);
+    --hw-ink: oklch(0.82 0.11 55);
+    --hw-soft: oklch(0.28 0.055 45);
+    --hw-tint: oklch(0.25 0.035 45);
+    --hw-line: oklch(0.4 0.08 45);
+
+    --ml: oklch(0.76 0.14 300);
+    --ml-ink: oklch(0.8 0.11 300);
+    --ml-soft: oklch(0.28 0.05 300);
+    --ml-tint: oklch(0.25 0.03 300);
+    --ml-line: oklch(0.42 0.07 300);
+
+    --sw: oklch(0.75 0.12 215);
+    --sw-ink: oklch(0.8 0.1 215);
+    --sw-soft: oklch(0.27 0.04 215);
+    --sw-tint: oklch(0.25 0.03 215);
+    --sw-line: oklch(0.42 0.06 215);
+
+    --tw: oklch(0.75 0.13 150);
+    --tw-ink: oklch(0.8 0.1 150);
+    --tw-soft: oklch(0.27 0.045 150);
+    --tw-tint: oklch(0.25 0.03 150);
+    --tw-line: oklch(0.4 0.07 150);
+
+    --good: oklch(0.75 0.13 150);
+    --warn: oklch(0.78 0.14 70);
+    --serious: oklch(0.75 0.15 40);
+    --crit: oklch(0.7 0.17 25);
+
+    --o1: oklch(0.35 0.06 264);
+    --o2: oklch(0.5 0.11 264);
+    --o3: oklch(0.62 0.14 264);
+    --o4: oklch(0.75 0.15 264);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --plane: oklch(0.16 0.012 265);
+  --surface: oklch(0.215 0.014 265);
+  --raise: oklch(0.235 0.014 265);
+  --sunken: oklch(0.19 0.012 265);
+  --chip: oklch(0.26 0.014 265);
+  --chip-hover: oklch(0.31 0.014 265);
+  --track: oklch(0.27 0.014 265);
+
+  --ink: oklch(0.97 0.006 265);
+  --ink2: oklch(0.8 0.012 265);
+  --muted: oklch(0.6 0.014 265);
+  --faint: oklch(0.5 0.014 265);
+
+  --ring: oklch(0.28 0.016 265);
+  --grid: oklch(0.26 0.016 265);
+  --axis: oklch(0.31 0.016 265);
+  --card-line: oklch(0.27 0.014 265);
+
+  --lift: none;
+  --lift-2: none;
+  --lift-3: 0 18px 40px -28px #000;
+
+  --accent: oklch(0.72 0.15 264);
+  --accent-hi: oklch(0.78 0.14 264);
+  --accent-ink: oklch(0.78 0.13 264);
+  --accent-soft: oklch(0.28 0.06 264);
+  --accent-line: oklch(0.42 0.09 264);
+
+  --hw: oklch(0.78 0.14 55);
+  --hw-ink: oklch(0.82 0.11 55);
+  --hw-soft: oklch(0.28 0.055 45);
+  --hw-tint: oklch(0.25 0.035 45);
+  --hw-line: oklch(0.4 0.08 45);
+
+  --ml: oklch(0.76 0.14 300);
+  --ml-ink: oklch(0.8 0.11 300);
+  --ml-soft: oklch(0.28 0.05 300);
+  --ml-tint: oklch(0.25 0.03 300);
+  --ml-line: oklch(0.42 0.07 300);
+
+  --sw: oklch(0.75 0.12 215);
+  --sw-ink: oklch(0.8 0.1 215);
+  --sw-soft: oklch(0.27 0.04 215);
+  --sw-tint: oklch(0.25 0.03 215);
+  --sw-line: oklch(0.42 0.06 215);
+
+  --tw: oklch(0.75 0.13 150);
+  --tw-ink: oklch(0.8 0.1 150);
+  --tw-soft: oklch(0.27 0.045 150);
+  --tw-tint: oklch(0.25 0.03 150);
+  --tw-line: oklch(0.4 0.07 150);
+
+  --good: oklch(0.75 0.13 150);
+  --warn: oklch(0.78 0.14 70);
+  --serious: oklch(0.75 0.15 40);
+  --crit: oklch(0.7 0.17 25);
+
+  --o1: oklch(0.35 0.06 264);
+  --o2: oklch(0.5 0.11 264);
+  --o3: oklch(0.62 0.14 264);
+  --o4: oklch(0.75 0.15 264);
+}
+
+html,
+body {
+  background: var(--plane);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, -apple-system, "Noto Sans TC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--card-line);
+    border-radius: 16px;
+    box-shadow: var(--lift);
+  }
+  /* an entry card sits above the section it belongs to */
+  .card-raised {
+    box-shadow: var(--lift-2);
+  }
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded-[9px] px-3 py-[7px] text-[12px] font-medium transition;
+    background: var(--chip);
+    border: 1px solid transparent;
+    color: var(--ink2);
+  }
+  .btn:hover {
+    color: var(--ink);
+    background: var(--chip-hover);
+  }
+  .btn-primary {
+    background: var(--accent);
+    border-color: transparent;
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: var(--accent-hi);
+    color: #fff;
+  }
+  .btn-sm {
+    @apply rounded-lg px-2 py-1 text-[11px];
+  }
+  .btn-mono {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-weight: 400;
+  }
+  /* row-level icon actions. Quiet, but not so quiet they disappear into warm paper —
+     --faint reads at ~2:1 on white, which is a glyph you have to hunt for. */
+  .ibtn {
+    @apply rounded-md px-1.5 py-0.5 text-[13px] leading-none transition disabled:opacity-25;
+    background: transparent;
+    color: var(--ink2);
+  }
+  .ibtn:hover:not(:disabled) {
+    background: var(--chip-hover);
+    color: var(--ink);
+  }
+  .ibtn-danger,
+  .ibtn-danger:hover:not(:disabled) {
+    color: var(--crit);
+  }
+  /* a table row that answers to a double-click. The tint is the only hint it needs —
+     a pointer cursor would promise a single click that does nothing. */
+  .row-dbl {
+    transition: background 120ms;
+  }
+  .row-dbl:hover {
+    background: var(--sunken);
+  }
+  .inp {
+    @apply w-full rounded-[10px] px-2.5 py-1.5 text-[13px] outline-none transition;
+    background: var(--plane);
+    border: 1px solid var(--ring);
+    color: var(--ink);
+  }
+  .inp:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .lbl {
+    @apply mb-1.5 block text-[9.5px] font-medium uppercase;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    letter-spacing: 0.16em;
+    color: var(--faint);
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px];
+    font-family: var(--font-mono), ui-monospace, monospace;
+    background: var(--chip);
+    color: var(--ink2);
+  }
+  .mono {
+    font-family: var(--font-mono), ui-monospace, monospace;
+  }
+  .tabnum {
+    font-variant-numeric: tabular-nums;
+  }
+  /* the hairline that finishes a label row */
+  .rule {
+    flex: 1;
+    height: 1px;
+    background: var(--grid);
+  }
+  .ck {
+    accent-color: var(--accent);
+  }
+}
+
+/* A textarea that grows with its text. A hidden replica of the value shares the grid
+   cell, so the row is sized by layout instead of by measuring — no zero-width first paint. */
+.grow {
+  display: grid;
+}
+.grow::after {
+  content: attr(data-value) " ";
+  white-space: pre-wrap;
+  visibility: hidden;
+}
+.grow > textarea {
+  resize: none;
+  overflow: hidden;
+}
+.grow > textarea,
+.grow::after {
+  grid-area: 1 / 1 / 2 / 2;
+  min-width: 0;
+  font: inherit;
+  padding: 0;
+  border: none;
+  word-break: break-word;
+}
+
+/* XCharter — the same digitization of Bitstream Charter that \usepackage{charter} loads, so
+   the browser measures a line exactly as pdflatex will. macOS ships its own Charter TrueType
+   and it is ~3.6% narrower: close enough to look right, far enough that a header sitting near
+   the column width wraps in one engine and not the other. `block` rather than `swap`, because
+   a fallback painted for even one frame is a fallback Chrome might print. See fonts/LICENSE.txt. */
+@font-face {
+  font-family: XCharter;
+  src: url("/fonts/xcharter-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: XCharter;
+  src: url("/fonts/xcharter-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: XCharter;
+  src: url("/fonts/xcharter-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: block;
+}
+@font-face {
+  font-family: XCharter;
+  src: url("/fonts/xcharter-bolditalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: block;
+}
+
+/* Reserve the scrollbar's track whether or not it is showing: Preview sizes the sheet from
+   this box's clientWidth, and a gutter that comes and goes would rescale the page under it. */
+.preview-scroll {
+  scrollbar-gutter: stable;
+}
+
+/* the sheet is what prints, so it stays paper-white in dark mode and keeps Charter — the
+   same family \usepackage{charter} sets in the generated .tex. The bundled XCharter comes
+   first: the system copies behind it are the same typeface but not the same metrics. */
+.paper {
+  background: #fff;
+  color: #111;
+  font-family: XCharter, Charter, "Bitstream Charter", Georgia, "Times New Roman", serif;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+.paper a {
+  color: inherit;
+  text-decoration: none;
+}
+/* links stay visually plain on paper; the underline is a screen-only affordance */
+.paper a:hover {
+  text-decoration: underline;
+}
+.paper .sec {
+  font-variant: small-caps;
+  border-bottom: 1px solid #111;
+  letter-spacing: 0.02em;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--axis);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media print {
+  .noprint {
+    display: none !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* the sheet has to own the page box, so strip every layout wrapper around it */
+  .print-shell {
+    min-height: 0 !important;
+  }
+  .print-root {
+    display: block !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+  .print-col {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+  }
+  /* on screen this box clips the sheet to the viewport; on paper it must not clip at all */
+  .preview-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  /* preview-only sizing box: it holds the on-screen scale, which print must not inherit */
+  .print-sheet {
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+  /* width/padding are set per variant alongside the @page box — see printCss() in Preview.tsx */
+  .paper {
+    box-shadow: none !important;
+    transform: none !important;
+    margin: 0 !important;
+  }
+}

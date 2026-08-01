@@ -1,0 +1,23 @@
+XCharter, by Michael Sharpe — an extension of Bitstream Charter.
+Subset here to the Latin-1 range plus the punctuation the resume uses; the
+originals ship with TeX Live under fonts/opentype/public/xcharter.
+
+The preview embeds these so the browser measures text with the same metrics
+pdflatex does through \usepackage{charter} — same digitization, same advance
+widths, so a line that wraps in one wraps in the other.
+
+Bitstream's notice, reproduced as that license requires:
+
+  (c) Copyright 1989-1992, Bitstream Inc., Cambridge, MA.
+
+  You are hereby granted permission under all Bitstream propriety rights
+  to use, copy, modify, sublicense, sell, and redistribute the 4
+  Bitstream Charter (r) Type 1 outline fonts for any purpose and without
+  restriction; provided, that this notice is left intact on all copies
+  of such fonts and that Bitstream's trademark is acknowledged as shown
+  below on all unmodified copies of the 4 Charter Type 1 fonts.
+
+    BITSTREAM CHARTER is a registered trademark of Bitstream Inc.
+
+Portions of the font modifications are Copyright (c) 2009--2012, Andrey Panov;
+Copyright (c) 2013--2024, Michael Sharpe.

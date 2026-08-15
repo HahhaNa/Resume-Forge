@@ -112,16 +112,24 @@ export function IconBtn({
 }
 
 /* ------------------------------------------------------------------ *
- * variant hues — four same-chroma families. A tag, a variant tab and a
- * chart series that share a slug share a hue, so colour carries meaning.
+ * hues — four same-chroma families, addressed by slot rather than by
+ * name so the tag vocabulary can be anything. A tag, a variant tab and
+ * a chart series in the same slot share a hue, so colour carries
+ * meaning. More than four tags wrap, which is why the four are ordered
+ * by how far apart they read.
  * ------------------------------------------------------------------ */
 
-export const HUES = ["hw", "ml", "sw", "tw"] as const;
+export const HUES = ["t1", "t2", "t3", "t4"] as const;
 export type Hue = (typeof HUES)[number];
 
-/** Named slug wins; anything else cycles the four families by position. */
-export function hueOf(key: string, index = 0): Hue {
-  return (HUES as readonly string[]).includes(key) ? (key as Hue) : HUES[index % HUES.length];
+/**
+ * The hue for `key`. A key in `vocab` takes the slot at its position there, so a
+ * variant named after a tag inherits that tag's colour; anything else falls back
+ * to `index`.
+ */
+export function hueOf(key: string, index = 0, vocab: string[] = []): Hue {
+  const at = vocab.indexOf(key);
+  return HUES[((at >= 0 ? at : index) % HUES.length + HUES.length) % HUES.length];
 }
 
 export const hue = (h: Hue | string, part?: "ink" | "soft" | "tint" | "line") =>
@@ -137,22 +145,29 @@ export function Dot({ color, size = 7 }: { color: string; size?: number }) {
   );
 }
 
+/**
+ * `all` is what to draw; `vocab` is what fixes the colours. They differ when a
+ * caller shows a subset — a filtered list must not re-colour what it kept.
+ */
 export function TagChips({
   tags,
   all,
+  vocab,
   onToggle,
   size = "sm",
 }: {
   tags: string[];
   all: string[];
+  vocab?: string[];
   onToggle?: (t: string) => void;
   size?: "sm" | "xs";
 }) {
+  const order = vocab ?? all;
   return (
     <span className="inline-flex flex-wrap gap-1">
       {all.map((t, i) => {
         const on = tags.includes(t);
-        const h = hueOf(t, i);
+        const h = hueOf(t, i, order);
         return (
           <button
             key={t}

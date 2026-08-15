@@ -153,9 +153,30 @@ const dict = {
     exportJson: "Export JSON",
     importJson: "Import JSON",
     reset: "Reset to sample data",
-    resetConfirm: "Replace everything with the sample data? This cannot be undone.",
+    resetConfirm: "Replace everything with the sample data? A restore point is kept.",
     dataNote:
       "Everything lives in this browser only. Export a JSON backup regularly, and import it on another machine to move your data.",
+
+    tagVocab: "Tags",
+    tagVocabNote:
+      "Your own vocabulary — one per target you write for. A variant named after a tag picks up its colour, and a bullet tagged with it switches on by default in that variant.",
+    newTag: "Add tag",
+    renameTag: "Rename",
+    removeTagConfirm:
+      "Delete this tag? It is stripped from every bullet, entry and skill group that carries it. A restore point is not kept for this.",
+
+    restorePoints: "Restore points",
+    restorePointsNote:
+      "A copy of the whole database is kept before each import and reset, so a bad import is one click away from being undone. Newest first; the oldest fall off.",
+    noRestorePoints: "Nothing to restore yet — one is taken the next time you import or reset.",
+    restore: "Restore",
+    restoreConfirm: "Restore this copy? What is on screen now becomes a restore point of its own.",
+    restored: "Restored.",
+    undoImport: "Undo import",
+    importedReplaced: "Replaced your library with the imported resume.",
+    importedAppended: "Added the imported resume alongside what you had.",
+    importUndoNote:
+      "A restore point was taken first. Undo it here, or later from the Data tab.",
     profile: "Profile",
     name: "Name",
     email: "Email",
@@ -323,8 +344,27 @@ const dict = {
     exportJson: "匯出 JSON",
     importJson: "匯入 JSON",
     reset: "還原成範例資料",
-    resetConfirm: "把全部資料換成範例資料？無法復原。",
+    resetConfirm: "把全部資料換成範例資料？系統會先留一個還原點。",
     dataNote: "所有資料只存在這個瀏覽器。請定期匯出 JSON 備份，換電腦時匯入即可。",
+
+    tagVocab: "標籤",
+    tagVocabNote:
+      "標籤由你自己定義，通常一個投遞方向一個。版本名稱和標籤同名時會共用顏色；帶該標籤的 bullet 在對應版本裡預設會被勾選。",
+    newTag: "新增標籤",
+    renameTag: "重新命名",
+    removeTagConfirm: "刪除這個標籤？所有 bullet、經歷和技能上的這個標籤都會被移除，而且不會留還原點。",
+
+    restorePoints: "還原點",
+    restorePointsNote:
+      "每次匯入和重設前都會先備份整個資料庫，匯錯了按一下就能救回來。由新到舊排列，太舊的會自動移除。",
+    noRestorePoints: "目前沒有還原點；下次匯入或重設時會自動建立。",
+    restore: "還原",
+    restoreConfirm: "還原成這份備份？目前畫面上的資料會另外存成一個還原點。",
+    restored: "已還原。",
+    undoImport: "復原這次匯入",
+    importedReplaced: "已用匯入的履歷取代原本的資料。",
+    importedAppended: "已把匯入的履歷加在原本的資料旁邊。",
+    importUndoNote: "匯入前已自動建立還原點。可以在這裡直接復原，或之後到 Data 分頁還原。",
     profile: "個人資料",
     name: "姓名",
     email: "Email",

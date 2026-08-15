@@ -112,7 +112,8 @@ export interface Application {
   role: string;
   team: string;
   location: string;
-  region: "US" | "TW" | "EU" | "Other";
+  /** Free text. Past entries are offered as suggestions rather than a fixed list. */
+  region: string;
   variantId: string;
   snapshot?: Snapshot;
   status: AppStatus;
@@ -162,6 +163,8 @@ export interface Problem {
 export interface DB {
   version: number;
   profile: Profile;
+  /** The tag vocabulary, in display order. Position picks the colour. */
+  tags: string[];
   entries: Entry[];
   skills: SkillGroup[];
   variants: Variant[];
@@ -169,5 +172,23 @@ export interface DB {
   platforms: Platform[];
   problems: Problem[];
 }
+
+/**
+ * A whole-database copy taken immediately before something destructive.
+ *
+ * Importing with "replace" used to drop every entry, skill and variant with no
+ * way back — the reason this exists. Points are persisted alongside the data, so
+ * a mistake noticed a day later is still undoable.
+ */
+export interface RestorePoint {
+  id: string;
+  at: string;
+  /** What was about to happen, e.g. `Before importing resume.tex`. */
+  label: string;
+  db: DB;
+}
+
+/** Oldest points fall off the end. Each is roughly the size of the database. */
+export const MAX_RESTORE_POINTS = 8;
 
 export const REVIEW_INTERVALS: Record<number, number> = { 1: 1, 2: 3, 3: 7, 4: 16, 5: 35 };

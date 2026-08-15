@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useT } from "@/lib/i18n";
-import { Field } from "@/components/ui/bits";
+import { Field, hue, hueOf, IconBtn } from "@/components/ui/bits";
 import ImportResume from "@/components/ImportResume";
 import type { DB } from "@/lib/types";
 
@@ -92,6 +92,8 @@ export default function DataPage() {
         </div>
       </div>
 
+      <TagVocab />
+
       <div className="card p-3.5">
         <div className="mb-1 flex items-center gap-2.5">
           <h2 className="text-[13.5px] font-semibold leading-none">{t("nav_data")}</h2>
@@ -145,7 +147,169 @@ export default function DataPage() {
         </div>
       </div>
 
+      <RestorePoints />
+
       <ImportResume open={importOpen} onClose={() => setImportOpen(false)} />
+    </div>
+  );
+}
+
+/**
+ * The tag vocabulary. Renaming rewrites every use, so the tags on existing bullets
+ * follow the rename instead of being orphaned; deleting strips them, which is why
+ * it asks first.
+ */
+function TagVocab() {
+  const s = useStore();
+  const t = useT();
+  const tags = s.db.tags;
+  const [draft, setDraft] = useState("");
+
+  const counts = useMemo(() => {
+    const n = new Map<string, number>();
+    const bump = (xs: string[]) => xs.forEach((x) => n.set(x, (n.get(x) ?? 0) + 1));
+    for (const e of s.db.entries) {
+      bump(e.tags);
+      for (const b of e.bullets) bump(b.tags);
+    }
+    for (const k of s.db.skills) bump(k.tags);
+    return n;
+  }, [s.db.entries, s.db.skills]);
+
+  return (
+    <div className="card p-3.5">
+      <div className="mb-1 flex items-center gap-2.5">
+        <h2 className="text-[13.5px] font-semibold leading-none">{t("tagVocab")}</h2>
+        <span className="rule" />
+      </div>
+      <p className="mb-3 text-[12px]" style={{ color: "var(--muted)" }}>
+        {t("tagVocabNote")}
+      </p>
+
+      <div className="flex flex-col gap-1.5">
+        {tags.map((tag, i) => {
+          const h = hueOf(tag, i, tags);
+          const used = counts.get(tag) ?? 0;
+          return (
+            <div key={tag} className="flex items-center gap-2">
+              <span
+                className="mono shrink-0 rounded-md px-1.5 text-[10.5px] leading-[18px]"
+                style={{ background: hue(h, "soft"), color: hue(h, "ink") }}
+              >
+                {tag}
+              </span>
+              <span className="mono text-[10.5px]" style={{ color: "var(--faint)" }}>
+                {used} {used === 1 ? "use" : "uses"}
+              </span>
+              <span className="rule" />
+              <IconBtn
+                disabled={i === 0}
+                title="Move up"
+                onClick={() => s.moveTag(tag, -1)}
+              >
+                ↑
+              </IconBtn>
+              <IconBtn
+                disabled={i === tags.length - 1}
+                title="Move down"
+                onClick={() => s.moveTag(tag, 1)}
+              >
+                ↓
+              </IconBtn>
+              <button
+                className="btn btn-sm"
+                onClick={() => {
+                  const to = prompt(t("renameTag"), tag);
+                  if (to) s.renameTag(tag, to);
+                }}
+              >
+                {t("renameTag")}
+              </button>
+              <IconBtn
+                danger
+                title={t("remove")}
+                onClick={() => confirm(t("removeTagConfirm")) && s.removeTag(tag)}
+              >
+                ✕
+              </IconBtn>
+            </div>
+          );
+        })}
+      </div>
+
+      <form
+        className="mt-3 flex items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          s.addTag(draft);
+          setDraft("");
+        }}
+      >
+        <Field
+          label={t("newTag")}
+          className="max-w-[200px]"
+          value={draft}
+          onChange={setDraft}
+          placeholder="e.g. design"
+        />
+        <button className="btn" type="submit" disabled={!draft.trim()}>
+          + {t("newTag")}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/** The way back from an import that ate everything. */
+function RestorePoints() {
+  const s = useStore();
+  const t = useT();
+  const points = s.restorePoints;
+
+  return (
+    <div className="card p-3.5">
+      <div className="mb-1 flex items-center gap-2.5">
+        <h2 className="text-[13.5px] font-semibold leading-none">{t("restorePoints")}</h2>
+        <span className="rule" />
+      </div>
+      <p className="mb-3 text-[12px]" style={{ color: "var(--muted)" }}>
+        {t("restorePointsNote")}
+      </p>
+
+      {points.length === 0 ? (
+        <p className="text-[12px]" style={{ color: "var(--faint)" }}>
+          {t("noRestorePoints")}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {points.map((rp) => (
+            <div key={rp.id} className="flex items-center gap-2.5">
+              <span className="mono shrink-0 text-[10.5px]" style={{ color: "var(--faint)" }}>
+                {new Date(rp.at).toLocaleString()}
+              </span>
+              <span className="truncate text-[12px]">{rp.label}</span>
+              <span
+                className="mono shrink-0 text-[10.5px]"
+                style={{ color: "var(--faint)" }}
+                title="what this copy holds"
+              >
+                {rp.db.entries.length}e · {rp.db.variants.length}v ·{" "}
+                {rp.db.applications.length}a
+              </span>
+              <span className="rule" />
+              <button
+                className="btn btn-sm"
+                onClick={() => confirm(t("restoreConfirm")) && s.restore(rp.id)}
+              >
+                ↺ {t("restore")}
+              </button>
+              <IconBtn danger title={t("remove")} onClick={() => s.dropRestorePoint(rp.id)}>
+                ✕
+              </IconBtn>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

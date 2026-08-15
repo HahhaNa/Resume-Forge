@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/bits";
 import { CONTACT_FIELDS } from "@/lib/types";
 import type { Variant } from "@/lib/types";
-import { ALL_TAGS, KIND_ABBR, defaultBulletIds, entryHue } from "@/lib/library";
+import { KIND_ABBR, defaultBulletIds, entryHue } from "@/lib/library";
 
 /** A textarea that reads as plain text and grows with its content (see `.grow` in globals.css). */
 function AutoText({
@@ -152,7 +152,7 @@ export default function ResumePage() {
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {db.variants.map((v, i) => {
               const active = v.id === variant.id;
-              const h = hueOf(v.name, i);
+              const h = hueOf(v.name, i, db.tags);
               return (
                 <button
                   key={v.id}
@@ -326,7 +326,7 @@ export default function ResumePage() {
                         e.org.toLowerCase().includes(q.toLowerCase())
                     );
                     const onCount = e.bullets.filter((b) => on.has(b.id)).length;
-                    const h = entryHue(e);
+                    const h = entryHue(e, db.tags);
                     return (
                       <div key={eid} className="card card-raised flex flex-col gap-2.5 p-[13px]">
                         {/* header */}
@@ -361,7 +361,7 @@ export default function ResumePage() {
                                 >
                                   <TagChips
                                     tags={e.tags}
-                                    all={ALL_TAGS}
+                                    all={db.tags}
                                     onToggle={(tg) =>
                                       s.patchEntry(e.id, {
                                         tags: e.tags.includes(tg)
@@ -446,7 +446,8 @@ export default function ResumePage() {
                               <div className="flex shrink-0 items-start opacity-0 transition group-hover:opacity-100">
                                 <TagChips
                                   tags={[]}
-                                  all={ALL_TAGS.filter((x) => !b.tags.includes(x))}
+                                  all={db.tags.filter((x: string) => !b.tags.includes(x))}
+                                  vocab={db.tags}
                                   size="xs"
                                   onToggle={(tg) => s.patchBullet(e.id, b.id, { tags: [...b.tags, tg] })}
                                 />

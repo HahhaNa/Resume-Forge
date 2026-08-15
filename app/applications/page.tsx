@@ -10,7 +10,7 @@ import type { AppStatus, Application } from "@/lib/types";
 import { Bar, Dot, Field, hue, hueOf, IconBtn, Modal, Select, Stat } from "@/components/ui/bits";
 
 /* the funnel borrows the four variant hues, so a stage reads the same colour everywhere */
-const STAGE_HUE = ["var(--accent)", "var(--sw)", "var(--ml)", "var(--tw)"];
+const STAGE_HUE = ["var(--accent)", "var(--t3)", "var(--t2)", "var(--t4)"];
 const tone = (s: string) => `var(--${STATUS_LABEL[s]?.tone ?? "muted"})`;
 
 function daysTo(d: string) {
@@ -51,7 +51,7 @@ export default function ApplicationsPage() {
 
   const byVariant = db.variants.map((v, i) => ({
     v,
-    h: hueOf(v.name, i),
+    h: hueOf(v.name, i, db.tags),
     sent: submitted.filter((a) => a.variantId === v.id).length,
     adv: apps.filter((a) => a.variantId === v.id && ["oa", "interview", "offer"].includes(a.status)).length,
   }));
@@ -291,7 +291,7 @@ export default function ApplicationsPage() {
                       <td className="px-2 py-2">
                         {v ? (
                           <span className="mono inline-flex items-center gap-1.5 text-[11px]" style={{ color: "var(--ink2)" }}>
-                            <Dot color={hue(hueOf(v.name, vi))} />/{v.name}
+                            <Dot color={hue(hueOf(v.name, vi, db.tags))} />/{v.name}
                           </span>
                         ) : (
                           <span style={{ color: "var(--muted)" }}>—</span>
@@ -504,6 +504,7 @@ function AppModal({ id, onClose }: { id: string | null; onClose: () => void }) {
       company: pick((x) => x.company),
       team: pick((x) => x.team),
       location: pick((x) => x.location),
+      region: pick((x) => x.region),
       source: pick((x) => x.source),
       portal: pick((x) => x.portal),
       referral: pick((x) => x.referral),
@@ -546,11 +547,11 @@ function AppModal({ id, onClose }: { id: string | null; onClose: () => void }) {
         <div className="mb-3 grid gap-3 md:grid-cols-2">
           <Field label={t("team")} value={a.team} onChange={(v) => p({ team: v })} suggest={seen.team} />
           <Field label={t("location")} value={a.location} onChange={(v) => p({ location: v })} suggest={seen.location} />
-          <Select
+          <Field
             label={t("region")}
             value={a.region}
-            onChange={(v) => p({ region: v as Application["region"] })}
-            options={["US", "TW", "EU", "Other"].map((x) => ({ value: x, label: x }))}
+            onChange={(v) => p({ region: v })}
+            suggest={seen.region}
           />
           <Field label={t("source")} value={a.source} onChange={(v) => p({ source: v })} suggest={seen.source} />
           <Field label={t("portal")} value={a.portal} onChange={(v) => p({ portal: v })} suggest={seen.portal} />

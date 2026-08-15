@@ -472,6 +472,9 @@ for (const v of variants) {
 
 export const SEED: DB = {
   version: 1,
+  // The demo vocabulary — three target tracks plus one for a second language.
+  // Rename, reorder or replace these from the Data tab; nothing is hardcoded.
+  tags: ["hw", "ml", "sw", "tw"],
   profile: {
     name: "Jane Doe",
     headline: "MSCSE candidate | Hardware + ML Systems",
@@ -486,11 +489,12 @@ export const SEED: DB = {
   skills,
   variants,
   applications: [],
+  // Two placeholders so the tab is not empty. Point them at whatever you actually
+  // practise on from the Practice tab; a platform served by deep-ml.com additionally
+  // gets catalogue sync, which is detected from the URL rather than from this list.
   platforms: [
-    { id: "p-lc", name: "LeetCode", url: "https://leetcode.com", kind: "algorithms", color: "s2", target: 300 },
-    { id: "p-nc", name: "NeetCode 150", url: "https://neetcode.io", kind: "algorithms", color: "s1", target: 150 },
-    { id: "p-dml", name: "Deep-ML", url: "https://www.deep-ml.com", kind: "ml", color: "s3", target: 60 },
-    { id: "p-hdl", name: "HDLBits", url: "https://hdlbits.01xz.net", kind: "hardware", color: "s4", target: 180 },
+    { id: "p-algo", name: "Algorithms", url: "", kind: "algorithms", color: "s1", target: 150 },
+    { id: "p-domain", name: "Domain practice", url: "", kind: "other", color: "s3", target: 60 },
   ],
   problems: [],
 };

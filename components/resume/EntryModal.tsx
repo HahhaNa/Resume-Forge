@@ -4,7 +4,7 @@ import { useStore } from "@/lib/store";
 import { useT } from "@/lib/i18n";
 import { Field, Modal, Select, TagChips } from "@/components/ui/bits";
 import VariantPicker from "@/components/resume/VariantPicker";
-import { ALL_TAGS, KINDS } from "@/lib/library";
+import { KINDS } from "@/lib/library";
 import type { Entry, EntryKind } from "@/lib/types";
 
 /** The one place an entry's own fields are edited — plus which variants carry it. */
@@ -39,7 +39,7 @@ export default function EntryModal({
           <span className="lbl">{t("tags")}</span>
           <TagChips
             tags={e.tags}
-            all={ALL_TAGS}
+            all={s.db.tags}
             onToggle={(tg) =>
               p({ tags: e.tags.includes(tg) ? e.tags.filter((x) => x !== tg) : [...e.tags, tg] })
             }

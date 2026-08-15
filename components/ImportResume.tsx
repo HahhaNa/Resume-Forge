@@ -7,7 +7,13 @@ import { Modal } from "@/components/ui/bits";
 import { richHtmlParts } from "@/lib/resume";
 import { draftStats, parsePlainText, parseTex, type Draft } from "@/lib/import";
 
-type Phase = { k: "idle" } | { k: "busy" } | { k: "ready"; draft: Draft; file: string } | { k: "error"; msg: string };
+type Phase =
+  | { k: "idle" }
+  | { k: "busy" }
+  | { k: "ready"; draft: Draft; file: string }
+  | { k: "error"; msg: string }
+  /** Import applied. Held open on purpose so undo is one click, not a hunt. */
+  | { k: "done"; mode: "replace" | "append"; entries: number; restorePointId: string };
 
 export default function ImportResume({ open, onClose }: { open: boolean; onClose: () => void }) {
   const s = useStore();
@@ -74,8 +80,8 @@ export default function ImportResume({ open, onClose }: { open: boolean; onClose
     const draft = trim(phase.draft);
     if (!draft.sections.length) return;
     if (mode === "replace" && !confirm(t("importReplaceConfirm"))) return;
-    s.importDraft(draft, mode);
-    close();
+    const { entries, restorePointId } = s.importDraft(draft, mode, phase.file);
+    setPhase({ k: "done", mode, entries, restorePointId });
   };
 
   const toggle = (key: string) =>
@@ -87,7 +93,38 @@ export default function ImportResume({ open, onClose }: { open: boolean; onClose
 
   return (
     <Modal open={open} onClose={close} title={t("importResume")} wide>
-      {phase.k === "ready" ? (
+      {phase.k === "done" ? (
+        <div className="space-y-3">
+          <div
+            className="rounded-xl p-3.5"
+            style={{ background: "var(--accent-soft)", border: "1px solid var(--accent-line)" }}
+          >
+            <div className="text-[13px] font-medium">
+              {phase.mode === "replace" ? t("importedReplaced") : t("importedAppended")}
+            </div>
+            <div className="mono mt-1 text-[11px]" style={{ color: "var(--ink2)" }}>
+              {phase.entries} {phase.entries === 1 ? "entry" : "entries"}
+            </div>
+          </div>
+          <p className="text-[12px]" style={{ color: "var(--muted)" }}>
+            {t("importUndoNote")}
+          </p>
+          <div className="flex gap-2">
+            <button
+              className="btn"
+              onClick={() => {
+                s.restore(phase.restorePointId);
+                close();
+              }}
+            >
+              ↺ {t("undoImport")}
+            </button>
+            <button className="btn btn-primary" onClick={close}>
+              {t("done")}
+            </button>
+          </div>
+        </div>
+      ) : phase.k === "ready" ? (
         <Preview
           draft={phase.draft}
           file={phase.file}

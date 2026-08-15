@@ -41,7 +41,7 @@ export default function VariantPicker({
       <div className="mt-2 flex flex-wrap gap-1.5">
         {db.variants.map((v, i) => {
           const on = isInVariant(v, id);
-          const h = hueOf(v.name, i);
+          const h = hueOf(v.name, i, db.tags);
           return (
             <button
               key={v.id}

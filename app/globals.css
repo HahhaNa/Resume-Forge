@@ -2,8 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Warm paper / cool ink. Four same-chroma variant hues (hw 45, ml 300, sw 215, tw 150)
-   carry meaning across every screen, so a tag reads the same in a bullet, a tab and a chart. */
+/* Warm paper / cool ink. Four same-chroma hues (t1 45, t2 300, t3 215, t4 150) addressed by
+   slot, not by name, so the tag vocabulary is the user's. A tag and a variant in the same
+   slot read the same in a bullet, a tab and a chart. A fifth tag wraps back to t1. */
 :root {
   color-scheme: light;
 
@@ -40,30 +41,30 @@
   --accent-soft: oklch(0.968 0.022 264);
   --accent-line: oklch(0.9 0.05 264);
 
-  /* variant hues */
-  --hw: oklch(0.62 0.15 45);
-  --hw-ink: oklch(0.5 0.13 45);
-  --hw-soft: oklch(0.955 0.035 45);
-  --hw-tint: oklch(0.965 0.025 45);
-  --hw-line: oklch(0.88 0.06 45);
+  /* tag / variant hue slots */
+  --t1: oklch(0.62 0.15 45);
+  --t1-ink: oklch(0.5 0.13 45);
+  --t1-soft: oklch(0.955 0.035 45);
+  --t1-tint: oklch(0.965 0.025 45);
+  --t1-line: oklch(0.88 0.06 45);
 
-  --ml: oklch(0.58 0.16 300);
-  --ml-ink: oklch(0.47 0.15 300);
-  --ml-soft: oklch(0.96 0.03 300);
-  --ml-tint: oklch(0.975 0.018 300);
-  --ml-line: oklch(0.87 0.06 300);
+  --t2: oklch(0.58 0.16 300);
+  --t2-ink: oklch(0.47 0.15 300);
+  --t2-soft: oklch(0.96 0.03 300);
+  --t2-tint: oklch(0.975 0.018 300);
+  --t2-line: oklch(0.87 0.06 300);
 
-  --sw: oklch(0.58 0.13 215);
-  --sw-ink: oklch(0.45 0.11 215);
-  --sw-soft: oklch(0.955 0.03 215);
-  --sw-tint: oklch(0.975 0.015 215);
-  --sw-line: oklch(0.86 0.05 215);
+  --t3: oklch(0.58 0.13 215);
+  --t3-ink: oklch(0.45 0.11 215);
+  --t3-soft: oklch(0.955 0.03 215);
+  --t3-tint: oklch(0.975 0.015 215);
+  --t3-line: oklch(0.86 0.05 215);
 
-  --tw: oklch(0.56 0.13 150);
-  --tw-ink: oklch(0.44 0.11 150);
-  --tw-soft: oklch(0.95 0.035 150);
-  --tw-tint: oklch(0.973 0.018 150);
-  --tw-line: oklch(0.86 0.06 150);
+  --t4: oklch(0.56 0.13 150);
+  --t4-ink: oklch(0.44 0.11 150);
+  --t4-soft: oklch(0.95 0.035 150);
+  --t4-tint: oklch(0.973 0.018 150);
+  --t4-line: oklch(0.86 0.06 150);
 
   /* semantic */
   --good: oklch(0.5 0.13 150);
@@ -73,11 +74,11 @@
 
   /* legacy series slots — Platform.color persists "s1".."s6", so these ids must survive */
   --s1: var(--accent);
-  --s2: var(--hw);
-  --s3: var(--tw);
+  --s2: var(--t1);
+  --s3: var(--t4);
   --s4: var(--warn);
-  --s5: var(--ml);
-  --s6: var(--sw);
+  --s5: var(--t2);
+  --s6: var(--t3);
   --o1: oklch(0.86 0.05 264);
   --o2: oklch(0.74 0.1 264);
   --o3: oklch(0.64 0.14 264);
@@ -116,29 +117,29 @@
     --accent-soft: oklch(0.28 0.06 264);
     --accent-line: oklch(0.42 0.09 264);
 
-    --hw: oklch(0.78 0.14 55);
-    --hw-ink: oklch(0.82 0.11 55);
-    --hw-soft: oklch(0.28 0.055 45);
-    --hw-tint: oklch(0.25 0.035 45);
-    --hw-line: oklch(0.4 0.08 45);
+    --t1: oklch(0.78 0.14 55);
+    --t1-ink: oklch(0.82 0.11 55);
+    --t1-soft: oklch(0.28 0.055 45);
+    --t1-tint: oklch(0.25 0.035 45);
+    --t1-line: oklch(0.4 0.08 45);
 
-    --ml: oklch(0.76 0.14 300);
-    --ml-ink: oklch(0.8 0.11 300);
-    --ml-soft: oklch(0.28 0.05 300);
-    --ml-tint: oklch(0.25 0.03 300);
-    --ml-line: oklch(0.42 0.07 300);
+    --t2: oklch(0.76 0.14 300);
+    --t2-ink: oklch(0.8 0.11 300);
+    --t2-soft: oklch(0.28 0.05 300);
+    --t2-tint: oklch(0.25 0.03 300);
+    --t2-line: oklch(0.42 0.07 300);
 
-    --sw: oklch(0.75 0.12 215);
-    --sw-ink: oklch(0.8 0.1 215);
-    --sw-soft: oklch(0.27 0.04 215);
-    --sw-tint: oklch(0.25 0.03 215);
-    --sw-line: oklch(0.42 0.06 215);
+    --t3: oklch(0.75 0.12 215);
+    --t3-ink: oklch(0.8 0.1 215);
+    --t3-soft: oklch(0.27 0.04 215);
+    --t3-tint: oklch(0.25 0.03 215);
+    --t3-line: oklch(0.42 0.06 215);
 
-    --tw: oklch(0.75 0.13 150);
-    --tw-ink: oklch(0.8 0.1 150);
-    --tw-soft: oklch(0.27 0.045 150);
-    --tw-tint: oklch(0.25 0.03 150);
-    --tw-line: oklch(0.4 0.07 150);
+    --t4: oklch(0.75 0.13 150);
+    --t4-ink: oklch(0.8 0.1 150);
+    --t4-soft: oklch(0.27 0.045 150);
+    --t4-tint: oklch(0.25 0.03 150);
+    --t4-line: oklch(0.4 0.07 150);
 
     --good: oklch(0.75 0.13 150);
     --warn: oklch(0.78 0.14 70);
@@ -183,29 +184,29 @@
   --accent-soft: oklch(0.28 0.06 264);
   --accent-line: oklch(0.42 0.09 264);
 
-  --hw: oklch(0.78 0.14 55);
-  --hw-ink: oklch(0.82 0.11 55);
-  --hw-soft: oklch(0.28 0.055 45);
-  --hw-tint: oklch(0.25 0.035 45);
-  --hw-line: oklch(0.4 0.08 45);
+  --t1: oklch(0.78 0.14 55);
+  --t1-ink: oklch(0.82 0.11 55);
+  --t1-soft: oklch(0.28 0.055 45);
+  --t1-tint: oklch(0.25 0.035 45);
+  --t1-line: oklch(0.4 0.08 45);
 
-  --ml: oklch(0.76 0.14 300);
-  --ml-ink: oklch(0.8 0.11 300);
-  --ml-soft: oklch(0.28 0.05 300);
-  --ml-tint: oklch(0.25 0.03 300);
-  --ml-line: oklch(0.42 0.07 300);
+  --t2: oklch(0.76 0.14 300);
+  --t2-ink: oklch(0.8 0.11 300);
+  --t2-soft: oklch(0.28 0.05 300);
+  --t2-tint: oklch(0.25 0.03 300);
+  --t2-line: oklch(0.42 0.07 300);
 
-  --sw: oklch(0.75 0.12 215);
-  --sw-ink: oklch(0.8 0.1 215);
-  --sw-soft: oklch(0.27 0.04 215);
-  --sw-tint: oklch(0.25 0.03 215);
-  --sw-line: oklch(0.42 0.06 215);
+  --t3: oklch(0.75 0.12 215);
+  --t3-ink: oklch(0.8 0.1 215);
+  --t3-soft: oklch(0.27 0.04 215);
+  --t3-tint: oklch(0.25 0.03 215);
+  --t3-line: oklch(0.42 0.06 215);
 
-  --tw: oklch(0.75 0.13 150);
-  --tw-ink: oklch(0.8 0.1 150);
-  --tw-soft: oklch(0.27 0.045 150);
-  --tw-tint: oklch(0.25 0.03 150);
-  --tw-line: oklch(0.4 0.07 150);
+  --t4: oklch(0.75 0.13 150);
+  --t4-ink: oklch(0.8 0.1 150);
+  --t4-soft: oklch(0.27 0.045 150);
+  --t4-tint: oklch(0.25 0.03 150);
+  --t4-line: oklch(0.4 0.07 150);
 
   --good: oklch(0.75 0.13 150);
   --warn: oklch(0.78 0.14 70);

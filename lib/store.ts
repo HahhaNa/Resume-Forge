@@ -19,10 +19,11 @@ import type {
   Platform,
   Problem,
   Profile,
+  RestorePoint,
   SkillGroup,
   Variant,
 } from "./types";
-import { REVIEW_INTERVALS } from "./types";
+import { MAX_RESTORE_POINTS, REVIEW_INTERVALS } from "./types";
 
 export { uid, today };
 const stamp = () => new Date().toISOString();
@@ -88,12 +89,35 @@ interface Store extends UI {
   removeProblem: (id: string) => void;
   gradeProblem: (id: string, confidence: 1 | 2 | 3 | 4 | 5) => void;
 
+  addTag: (name: string) => void;
+  renameTag: (from: string, to: string) => void;
+  removeTag: (name: string) => void;
+  moveTag: (name: string, dir: -1 | 1) => void;
+
   importDB: (db: DB) => void;
-  importDraft: (draft: Draft, mode: "replace" | "append") => { variantId: string; entries: number };
+  importDraft: (
+    draft: Draft,
+    mode: "replace" | "append",
+    sourceName?: string
+  ) => { variantId: string; entries: number; restorePointId: string };
   resetDB: () => void;
+
+  /** Whole-database copies taken before anything destructive, newest first. */
+  restorePoints: RestorePoint[];
+  restore: (id: string) => boolean;
+  dropRestorePoint: (id: string) => void;
 }
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+
+/** A restore point for the database as it stands, newest first, oldest trimmed. */
+const withRestorePoint = (s: { db: DB; restorePoints: RestorePoint[] }, label: string) =>
+  [{ id: uid("rp"), at: stamp(), label, db: clone(s.db) }, ...s.restorePoints].slice(
+    0,
+    MAX_RESTORE_POINTS
+  );
+
+export const normTag = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 12);
 
 export const useStore = create<Store>()(
   persist(
@@ -493,7 +517,7 @@ export const useStore = create<Store>()(
                 role: "",
                 team: "",
                 location: "",
-                region: "US",
+                region: "",
                 variantId: s.activeVariantId,
                 status,
                 appliedAt: status === "saved" ? "" : today(),
@@ -613,10 +637,79 @@ export const useStore = create<Store>()(
           },
         })),
 
-      importDB: (db) => set({ db, activeVariantId: db.variants[0]?.id ?? "" }),
+      /* ---- tags -------------------------------------------------------- *
+       * The vocabulary is the user's, not the app's. Bullets, entries and
+       * skill groups store tag names, so renaming one rewrites every use and
+       * deleting one strips it — otherwise the data would keep orphan names. */
 
-      /** Turn a parsed .tex/.pdf draft into entries, skills and a variant that shows all of it. */
-      importDraft: (draft, mode) => {
+      addTag: (name) => {
+        const tag = normTag(name);
+        if (!tag) return;
+        set((s) => (s.db.tags.includes(tag) ? s : { db: { ...s.db, tags: [...s.db.tags, tag] } }));
+      },
+
+      renameTag: (from, to) => {
+        const tag = normTag(to);
+        if (!tag || tag === from) return;
+        set((s) => {
+          if (!s.db.tags.includes(from) || s.db.tags.includes(tag)) return s;
+          const swap = (xs: string[]) => xs.map((x) => (x === from ? tag : x));
+          return {
+            db: {
+              ...s.db,
+              tags: swap(s.db.tags),
+              entries: s.db.entries.map((e) => ({
+                ...e,
+                tags: swap(e.tags),
+                bullets: e.bullets.map((b) => ({ ...b, tags: swap(b.tags) })),
+              })),
+              skills: s.db.skills.map((k) => ({ ...k, tags: swap(k.tags) })),
+              // a variant named after the tag follows it, so hues stay attached
+              variants: s.db.variants.map((v) => (v.name === from ? { ...v, name: tag } : v)),
+            },
+          };
+        });
+      },
+
+      removeTag: (name) =>
+        set((s) => {
+          const drop = (xs: string[]) => xs.filter((x) => x !== name);
+          return {
+            db: {
+              ...s.db,
+              tags: drop(s.db.tags),
+              entries: s.db.entries.map((e) => ({
+                ...e,
+                tags: drop(e.tags),
+                bullets: e.bullets.map((b) => ({ ...b, tags: drop(b.tags) })),
+              })),
+              skills: s.db.skills.map((k) => ({ ...k, tags: drop(k.tags) })),
+            },
+          };
+        }),
+
+      moveTag: (name, dir) =>
+        set((s) => {
+          const i = s.db.tags.indexOf(name);
+          const j = i + dir;
+          if (i < 0 || j < 0 || j >= s.db.tags.length) return s;
+          const tags = [...s.db.tags];
+          [tags[i], tags[j]] = [tags[j], tags[i]];
+          return { db: { ...s.db, tags } };
+        }),
+
+      importDB: (db) =>
+        set((s) => ({
+          restorePoints: withRestorePoint(s, "Before importing a JSON backup"),
+          db,
+          activeVariantId: db.variants[0]?.id ?? "",
+        })),
+
+      /**
+       * Turn a parsed .tex/.pdf draft into entries, skills and a variant that shows all of it.
+       * "replace" throws the current library away, so it takes a restore point first.
+       */
+      importDraft: (draft, mode, sourceName) => {
         const st = get();
         const entries: Entry[] = [];
         const skills: SkillGroup[] = [];
@@ -676,10 +769,18 @@ export const useStore = create<Store>()(
           if (v && (mode === "replace" || !profile[k])) profile[k] = v;
         });
 
+        let restorePointId = "";
         set((s) => {
           const variants = mode === "replace" ? [variant] : [...s.db.variants, variant];
           const live = new Set(variants.map((v) => v.id));
+          const what = sourceName ? `"${sourceName}"` : `a ${draft.source.toUpperCase()} file`;
+          const restorePoints = withRestorePoint(
+            s,
+            mode === "replace" ? `Before replacing everything with ${what}` : `Before importing ${what}`
+          );
+          restorePointId = restorePoints[0].id;
           return {
+            restorePoints,
             db: {
               ...s.db,
               profile,
@@ -695,13 +796,57 @@ export const useStore = create<Store>()(
           };
         });
 
-        return { variantId: variant.id, entries: entries.length };
+        return { variantId: variant.id, entries: entries.length, restorePointId };
       },
-      resetDB: () => set({ db: clone(SEED), activeVariantId: SEED.variants[0].id }),
+
+      resetDB: () =>
+        set((s) => ({
+          restorePoints: withRestorePoint(s, "Before resetting to the demo content"),
+          db: clone(SEED),
+          activeVariantId: SEED.variants[0].id,
+        })),
+
+      restorePoints: [],
+
+      /** Restoring is itself undoable — the database being replaced becomes a point too. */
+      restore: (id) => {
+        const s = get();
+        const rp = s.restorePoints.find((x) => x.id === id);
+        if (!rp) return false;
+        set({
+          restorePoints: withRestorePoint(s, `Before restoring "${rp.label}"`).filter(
+            (x) => x.id !== id
+          ),
+          db: clone(rp.db),
+          activeVariantId: rp.db.variants[0]?.id ?? "",
+        });
+        return true;
+      },
+
+      dropRestorePoint: (id) =>
+        set((s) => ({ restorePoints: s.restorePoints.filter((x) => x.id !== id) })),
     }),
     {
       name: "resume-forge",
-      version: 1,
+      version: 2,
+      /** v1 had no tag vocabulary and no restore points: recover the former from the data. */
+      migrate: (persisted, from) => {
+        const s = persisted as Partial<Store>;
+        if (from < 2) {
+          s.restorePoints ??= [];
+          if (s.db && !s.db.tags) {
+            const seen = new Set<string>();
+            for (const v of s.db.variants ?? []) if (v.name) seen.add(v.name);
+            for (const e of s.db.entries ?? []) {
+              for (const x of e.tags) seen.add(x);
+              for (const b of e.bullets) for (const x of b.tags) seen.add(x);
+            }
+            for (const k of s.db.skills ?? []) for (const x of k.tags) seen.add(x);
+            s.db.tags = seen.size ? [...seen] : [...SEED.tags];
+          }
+        }
+        return s as Store;
+      },
       onRehydrateStorage: () => (state) => {
         if (state) state.hydrated = true;
       },

@@ -237,7 +237,7 @@ export default function PracticePage() {
                   <Bar
                     value={Math.max(x.solved, 0.12)}
                     max={Math.max(5, ...neededTopics.map((y) => y.solved))}
-                    color={x.solved === 0 ? "var(--crit)" : x.solved < 3 ? "var(--warn)" : "var(--tw)"}
+                    color={x.solved === 0 ? "var(--crit)" : x.solved < 3 ? "var(--warn)" : "var(--t4)"}
                     height={7}
                     tip={`${x.solved} solved · needed by ${x.companies.join(", ")}`}
                   />

@@ -54,8 +54,11 @@ The left pane is the variant you are editing; the right pane is a live page-accu
 - **Bullets are shared.** Every variant reads from the same library, so fixing a typo or updating
   a number fixes it everywhere. Tick a box to include a bullet in the variant you are editing.
   To put one entry into several variants at once, use the Library tab.
-- **Tags** (`hw` / `ml` / `sw` / `tw`) are a shortcut, not a rule. `Tagged /hw` selects every
-  bullet in that entry carrying the current variant's tag; `All` and `None` do the obvious thing.
+- **Tags** are your own vocabulary, edited in the Data tab — the demo ships `hw` / `ml` / `sw` /
+  `tw`, but rename or replace them and every bullet carrying the old name follows. They are a
+  shortcut, not a rule: `Tagged /hw` selects every bullet in that entry carrying the current
+  variant's tag; `All` and `None` do the obvious thing. A variant named after a tag shares its
+  colour.
 - **`**bold**`** inside bullet text becomes `\textbf{}` in LaTeX and bold in the preview. Use it
   on the number that matters, not on whole sentences.
 - **An entry with zero ticked bullets disappears** from the output. That is deliberate — it is how
@@ -154,9 +157,15 @@ and the review queue all aggregate across platforms.
 
 ### Data
 
-Profile fields, JSON export/import, and reset. **Export regularly** — browser storage is not a
-backup. The exported JSON is the whole database, so importing it on another machine moves
-everything.
+Profile fields, the tag vocabulary, JSON export/import, and reset. **Export regularly** — browser
+storage is not a backup. The exported JSON is the whole database, so importing it on another
+machine moves everything.
+
+**Restore points.** Importing a résumé with "Replace" throws away the current entries, skills and
+variants — so a copy of the whole database is taken first, and the same goes for a JSON import or
+a reset. Undo is offered on the spot when the import finishes, and the last eight points stay
+listed here with a timestamp and what each one holds. Restoring is itself undoable: whatever was
+on screen becomes a point of its own.
 
 ---
 

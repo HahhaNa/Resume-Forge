@@ -6,7 +6,6 @@ import { useT } from "@/lib/i18n";
 import EntryModal from "@/components/resume/EntryModal";
 import { Dot, hue, hueOf, IconBtn, TagChips } from "@/components/ui/bits";
 import {
-  ALL_TAGS,
   KINDS,
   KIND_ABBR,
   KIND_SECTION,
@@ -118,7 +117,7 @@ export default function LibraryPage() {
   const [editEntry, setEditEntry] = useState<string | null>(null);
 
   const hues = useMemo(
-    () => Object.fromEntries(db.variants.map((v, i) => [v.id, hueOf(v.name, i)])),
+    () => Object.fromEntries(db.variants.map((v, i) => [v.id, hueOf(v.name, i, db.tags)])) ,
     [db.variants]
   );
 
@@ -213,7 +212,7 @@ export default function LibraryPage() {
 
           <TagChips
             tags={tag ? [tag] : []}
-            all={ALL_TAGS}
+            all={db.tags}
             onToggle={(x) => setTag(tag === x ? null : x)}
           />
 
@@ -465,7 +464,7 @@ function GroupRows({
 
       {group.map((e) => {
         const expanded = open[e.id];
-        const h = entryHue(e);
+        const h = entryHue(e, db.tags);
         return (
           <Fragment key={e.id}>
             <tr className="group">
@@ -549,7 +548,7 @@ function GroupRows({
                       />
                       <TagChips
                         tags={b.tags}
-                        all={ALL_TAGS}
+                        all={db.tags}
                         size="xs"
                         onToggle={(tg) =>
                           s.patchBullet(e.id, b.id, {

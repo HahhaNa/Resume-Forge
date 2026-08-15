@@ -11,8 +11,6 @@
 import { uid } from "./id";
 import type { DB, Entry, EntryKind, Variant, VariantSection } from "./types";
 
-export const ALL_TAGS = ["hw", "ml", "sw", "tw"];
-
 export const KINDS: EntryKind[] = ["education", "experience", "project", "award", "activity"];
 
 export const KIND_ABBR: Record<EntryKind, string> = {
@@ -39,8 +37,8 @@ export const sectionHolding = (v: Variant, id: string) => v.sections.find((s) =>
 export const isInVariant = (v: Variant, id: string) => v.sections.some((s) => s.ids.includes(id));
 
 /** The hue an entry answers to: its own tag, else the tag most of its bullets carry. */
-export function entryHue(e: Entry): string | undefined {
-  const own = e.tags.find((x) => ALL_TAGS.includes(x));
+export function entryHue(e: Entry, tags: string[]): string | undefined {
+  const own = e.tags.find((x) => tags.includes(x));
   if (own) return own;
   const count = new Map<string, number>();
   for (const b of e.bullets) for (const tg of b.tags) count.set(tg, (count.get(tg) ?? 0) + 1);

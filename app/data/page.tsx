@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
+import { daysSince, useBackup } from "@/lib/backup";
 import { useT } from "@/lib/i18n";
-import { Field, hue, hueOf, IconBtn } from "@/components/ui/bits";
+import { Dot, Field, hue, hueOf, IconBtn } from "@/components/ui/bits";
 import ImportResume from "@/components/ImportResume";
 import type { DB } from "@/lib/types";
 
@@ -24,6 +25,7 @@ export default function DataPage() {
     a.download = `resume-forge-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
+    useBackup.getState().markExported();
   };
 
   const importJson = (f: File) => {
@@ -147,6 +149,8 @@ export default function DataPage() {
         </div>
       </div>
 
+      <BackupCard />
+
       <RestorePoints />
 
       <ImportResume open={importOpen} onClose={() => setImportOpen(false)} />
@@ -256,6 +260,105 @@ function TagVocab() {
           + {t("newTag")}
         </button>
       </form>
+    </div>
+  );
+}
+
+/** How each backup state reads: a colour, a line of explanation, and what to do about it. */
+const BACKUP_TONE: Record<string, { color: string; note: "backupOnNote" | "backupOffNote" | "backupLockedNote" | "backupConflictNote" | "backupErrorNote" | "backupUnsupportedNote" }> = {
+  on: { color: "var(--good)", note: "backupOnNote" },
+  off: { color: "var(--faint)", note: "backupOffNote" },
+  locked: { color: "var(--warn)", note: "backupLockedNote" },
+  conflict: { color: "var(--serious)", note: "backupConflictNote" },
+  error: { color: "var(--crit)", note: "backupErrorNote" },
+  unsupported: { color: "var(--faint)", note: "backupUnsupportedNote" },
+};
+
+/**
+ * Continuous backup to a file the user picks. The card is mostly status: the
+ * one interesting state is `conflict`, where the file disagrees with this
+ * browser and writing stops until someone says which copy wins.
+ */
+function BackupCard() {
+  const b = useBackup();
+  const t = useT();
+  const tone = BACKUP_TONE[b.status] ?? BACKUP_TONE.off;
+  const stale = b.status !== "on" ? daysSince(b.lastExportAt) : null;
+
+  return (
+    <div className="card p-3.5">
+      <div className="mb-1 flex items-center gap-2.5">
+        <h2 className="text-[13.5px] font-semibold leading-none">{t("backupFile")}</h2>
+        <span className="rule" />
+        <Dot color={tone.color} />
+        {b.fileName && (
+          <span className="mono truncate text-[10.5px]" style={{ color: "var(--faint)" }}>
+            {b.fileName}
+          </span>
+        )}
+      </div>
+      <p className="mb-3 text-[12px]" style={{ color: "var(--muted)" }}>
+        {t("backupNote")}
+      </p>
+
+      <p className="mb-3 text-[12px]" style={{ color: tone.color }}>
+        {t(tone.note)}
+        {b.error && <span className="mono ml-1.5 text-[11px]">{b.error}</span>}
+      </p>
+
+      {b.status !== "unsupported" && (
+        <div className="flex flex-wrap gap-2">
+          {b.status === "conflict" ? (
+            <>
+              <button className="btn btn-primary" onClick={() => b.takeIncoming()}>
+                ↓ {t("backupTakeIncoming")}
+                {b.incoming && (
+                  <span className="mono ml-1.5 text-[10.5px]" style={{ opacity: 0.75 }}>
+                    {b.incoming.entries.length}e · {b.incoming.applications.length}a
+                  </span>
+                )}
+              </button>
+              <button className="btn" onClick={() => void b.keepLocal()}>
+                ↑ {t("backupKeepLocal")}
+                <span className="mono ml-1.5 text-[10.5px]" style={{ color: "var(--faint)" }}>
+                  {useStore.getState().db.entries.length}e ·{" "}
+                  {useStore.getState().db.applications.length}a
+                </span>
+              </button>
+            </>
+          ) : b.status === "locked" ? (
+            <button className="btn btn-primary" onClick={() => void b.unlock()}>
+              ↻ {t("backupUnlock")}
+            </button>
+          ) : (
+            <>
+              <button
+                className={b.status === "on" ? "btn" : "btn btn-primary"}
+                onClick={() => void b.connectNew()}
+              >
+                {t("backupChoose")}
+              </button>
+              <button className="btn" onClick={() => void b.connectExisting()}>
+                {t("backupUseExisting")}
+              </button>
+            </>
+          )}
+          {b.status !== "off" && b.status !== "locked" && (
+            <button className="btn" style={{ color: "var(--crit)" }} onClick={() => void b.disconnect()}>
+              {t("backupStop")}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="mono mt-3 flex flex-wrap gap-x-4 text-[10.5px]" style={{ color: "var(--faint)" }}>
+        <span>
+          {t("backupLastSaved")}: {b.lastSavedAt ? new Date(b.lastSavedAt).toLocaleString() : t("backupNever")}
+        </span>
+        {stale !== null && stale >= 7 && (
+          <span style={{ color: "var(--warn)" }}>{t("backupStale").replace("{n}", String(stale))}</span>
+        )}
+      </div>
     </div>
   );
 }

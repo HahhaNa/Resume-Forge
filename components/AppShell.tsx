@@ -4,7 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
+import { useBackup } from "@/lib/backup";
 import { useT } from "@/lib/i18n";
+
+/**
+ * What the header says about where your data is. The states that need doing
+ * something about are coloured, and all of them are explained on the Data tab.
+ */
+const SAVED_AS: Record<string, { text: string; color: string }> = {
+  on: { text: "saved · file", color: "var(--good)" },
+  off: { text: "saved · local", color: "var(--faint)" },
+  unsupported: { text: "saved · local", color: "var(--faint)" },
+  locked: { text: "backup locked", color: "var(--warn)" },
+  conflict: { text: "backup paused", color: "var(--serious)" },
+  error: { text: "backup failed", color: "var(--crit)" },
+};
 
 const TABS = [
   { href: "/", key: "nav_resume" as const },
@@ -18,12 +32,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const t = useT();
   const { theme, setTheme, hydrated } = useStore();
+  const status = useBackup((b) => b.status);
 
   useEffect(() => {
     const el = document.documentElement;
     if (theme === "system") el.removeAttribute("data-theme");
     else el.setAttribute("data-theme", theme);
   }, [theme]);
+
+  // the backup file handle lives in IndexedDB, so it can only be picked up
+  // after mount — and it belongs here, not on the Data tab, because editing
+  // happens on every other tab
+  useEffect(() => {
+    void useBackup.getState().init();
+  }, []);
 
   return (
     <div className="print-shell min-h-screen">
@@ -55,9 +77,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="ml-auto flex items-center gap-2.5">
-          <span className="mono text-[10.5px]" style={{ color: "var(--faint)" }}>
-            {hydrated ? "saved · local" : "loading…"}
-          </span>
+          <Link
+            href="/data"
+            className="mono text-[10.5px]"
+            style={{ color: hydrated ? (SAVED_AS[status] ?? SAVED_AS.off).color : "var(--faint)" }}
+            title="Where your data is kept"
+          >
+            {hydrated ? (SAVED_AS[status] ?? SAVED_AS.off).text : "loading…"}
+          </Link>
           {/* language lives on the Data page — it is a set-once choice, not a toggle */}
           <button
             className="grid h-[30px] w-[30px] place-items-center rounded-[9px] text-[13px] transition"

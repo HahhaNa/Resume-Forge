@@ -157,6 +157,28 @@ const dict = {
     dataNote:
       "Everything lives in this browser only. Export a JSON backup regularly, and import it on another machine to move your data.",
 
+    backupFile: "Backup file",
+    backupNote:
+      "Browser storage is not a backup — it belongs to one origin and any cleanup takes it with it. Point this at a file inside iCloud Drive or Dropbox and every edit is written there a second later, which also makes it the way to carry your data between machines.",
+    backupOnNote: "Every edit is written to this file.",
+    backupOffNote: "Not set up. Nothing but this browser is holding your data.",
+    backupLockedNote:
+      "The file is still remembered, but the browser drops write permission on reload. One click gives it back.",
+    backupConflictNote:
+      "This file holds a copy this browser did not write — usually another machine. Nothing is written until you choose.",
+    backupErrorNote: "Writing failed. The file may have been moved, renamed or deleted.",
+    backupUnsupportedNote:
+      "This browser cannot write to files (Chrome and Edge can). Export JSON by hand and keep the file somewhere that syncs.",
+    backupChoose: "Choose a backup file",
+    backupUseExisting: "Use an existing backup",
+    backupUnlock: "Reconnect",
+    backupStop: "Stop backing up",
+    backupTakeIncoming: "Load the file's copy",
+    backupKeepLocal: "Keep this device's copy",
+    backupLastSaved: "Last written",
+    backupNever: "never",
+    backupStale: "Last export was {n} days ago.",
+
     tagVocab: "Tags",
     tagVocabNote:
       "Your own vocabulary — one per target you write for. A variant named after a tag picks up its colour, and a bullet tagged with it switches on by default in that variant.",
@@ -346,6 +368,27 @@ const dict = {
     reset: "還原成範例資料",
     resetConfirm: "把全部資料換成範例資料？系統會先留一個還原點。",
     dataNote: "所有資料只存在這個瀏覽器。請定期匯出 JSON 備份，換電腦時匯入即可。",
+
+    backupFile: "備份檔",
+    backupNote:
+      "瀏覽器儲存不是備份——它綁在單一網址上，瀏覽器清一次資料就沒了。指定一個放在 iCloud Drive 或 Dropbox 裡的檔案，之後每次修改一秒後就會寫進去；換電腦時也是靠這個檔案把資料帶著走。",
+    backupOnNote: "每次修改都會寫進這個檔案。",
+    backupOffNote: "尚未設定。目前只有這個瀏覽器存著你的資料。",
+    backupLockedNote: "檔案還記得，但瀏覽器每次重新載入都會收回寫入權限，按一下就能拿回來。",
+    backupConflictNote:
+      "這個檔案裡的版本不是這個瀏覽器寫的，通常代表你在另一台電腦改過。在你決定之前不會寫入任何東西。",
+    backupErrorNote: "寫入失敗，檔案可能被移動、改名或刪除了。",
+    backupUnsupportedNote:
+      "這個瀏覽器不支援寫入檔案（Chrome 和 Edge 可以）。請手動匯出 JSON，並放在會自動同步的資料夾裡。",
+    backupChoose: "選一個備份檔",
+    backupUseExisting: "使用既有的備份檔",
+    backupUnlock: "重新連接",
+    backupStop: "停止備份",
+    backupTakeIncoming: "載入檔案裡的版本",
+    backupKeepLocal: "保留這台裝置的版本",
+    backupLastSaved: "上次寫入",
+    backupNever: "從未",
+    backupStale: "距離上次匯出已經 {n} 天。",
 
     tagVocab: "標籤",
     tagVocabNote:

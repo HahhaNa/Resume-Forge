@@ -5,7 +5,8 @@ compose resume variants by ticking boxes, export real LaTeX, and track applicati
 against the same data.
 
 Built with Next.js 15 + TypeScript + Tailwind + Zustand. No accounts, no database. Everything is
-stored in your browser and exportable as one JSON file.
+stored in your browser, exportable as one JSON file, and — on Chrome and Edge — written
+continuously to a backup file you choose.
 
 The one server-side file is `app/api/deepml/route.ts`, a read-only passthrough to Deep-ML's public
 catalogue endpoints, needed because their CORS allowlist only admits `localhost:3000`. It sends
@@ -25,6 +26,12 @@ A fresh browser starts on the demo content in `lib/seed.ts` — a fictional cand
 only so the tabs have something in them. Overwrite it by editing entries directly, or import
 your own JSON export from the **Data** tab. Your copy lives in `localStorage` and is never
 written back to the repo.
+
+> **Set up the backup file first.** `localStorage` belongs to one *origin*, and the origin
+> includes the port — so if `:3000` is busy and `npm run dev` quietly lands on `:3001`, every
+> tab looks empty. Nothing was lost, but that is small comfort at the time. Deploy it (below)
+> so the URL never moves, and connect a backup file on the **Data** tab so the browser is
+> never the only copy.
 
 ## Deploy it (free)
 
@@ -157,9 +164,24 @@ and the review queue all aggregate across platforms.
 
 ### Data
 
-Profile fields, the tag vocabulary, JSON export/import, and reset. **Export regularly** — browser
-storage is not a backup. The exported JSON is the whole database, so importing it on another
-machine moves everything.
+Profile fields, the tag vocabulary, the backup file, JSON export/import, and reset. The exported
+JSON is the whole database, so importing it on another machine moves everything.
+
+**Backup file.** Browser storage is not a backup: it belongs to one origin and any cleanup takes
+it with it. Press `Choose a backup file`, put the file somewhere that syncs — iCloud Drive,
+Dropbox, a git-tracked folder — and every edit is written to it a second later. The header says
+`saved · file` once it is running. This needs the File System Access API, so Chrome and Edge only;
+Safari and Firefox show the manual export with a warning once it goes a week without one.
+
+That file is also how two machines share a job hunt. Each one connects to the same synced file,
+and on launch the app compares the file against what that browser holds:
+
+- same, or the file is empty → backup resumes silently
+- different → writing **stops** and you pick, with the entry and application counts of each side
+  shown on the buttons
+
+It never merges and it never picks for you. Two machines editing between syncs is a genuine fork,
+and the only way to actually lose work here would be to guess at it.
 
 **Restore points.** Importing a résumé with "Replace" throws away the current entries, skills and
 variants — so a copy of the whole database is taken first, and the same goes for a JSON import or
@@ -192,7 +214,7 @@ app/
   library/page.tsx      entry × variant matrix
   applications/page.tsx application tracker
   practice/page.tsx     multi-platform practice tracker
-  data/page.tsx         profile, import/export
+  data/page.tsx         profile, tags, backup file, import/export
   api/deepml/route.ts   read-only passthrough to Deep-ML's catalogue
 components/
   AppShell.tsx          nav, language toggle, theme toggle
@@ -204,6 +226,7 @@ lib/
   types.ts              the whole data model
   library.ts            entry ↔ variant rules: which section, what order, which bullets
   store.ts              zustand store, persisted to localStorage
+  backup.ts             continuous write to a user-picked file; handle in IndexedDB
   resume.ts             resolve(db, variant) -> LaTeX and preview
   ats.ts                job-board URL -> company, portal, role
   deepml.ts             Deep-ML catalogues: fetch, cache, search, link → ref

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
-import { useBackup } from "@/lib/backup";
+import { daysSince, useBackup } from "@/lib/backup";
 import { useT } from "@/lib/i18n";
 import UndoToast, { UndoButton } from "@/components/ui/Undo";
 
@@ -12,14 +12,30 @@ import UndoToast, { UndoButton } from "@/components/ui/Undo";
  * What the header says about where your data is. The states that need doing
  * something about are coloured, and all of them are explained on the Data tab.
  */
-const SAVED_AS: Record<string, { text: string; color: string }> = {
-  on: { text: "saved · file", color: "var(--good)" },
-  off: { text: "saved · local", color: "var(--faint)" },
-  unsupported: { text: "saved · local", color: "var(--faint)" },
-  locked: { text: "backup locked", color: "var(--warn)" },
-  conflict: { text: "backup paused", color: "var(--serious)" },
-  error: { text: "backup failed", color: "var(--crit)" },
+const SAVED_AS: Record<string, { text: string; color: string; title: string }> = {
+  on: { text: "saved · file", color: "var(--good)", title: "Written to your backup file" },
+  off: { text: "saved · local", color: "var(--faint)", title: "Where your data is kept" },
+  unsupported: { text: "saved · local", color: "var(--faint)", title: "Where your data is kept" },
+  locked: { text: "backup locked", color: "var(--warn)", title: "Permission to write the file lapsed — click to reconnect" },
+  conflict: { text: "backup paused", color: "var(--serious)", title: "The file disagrees with this browser — click to choose" },
+  error: { text: "backup failed", color: "var(--crit)", title: "The last write did not land — click for the reason" },
 };
+
+/**
+ * Not a status of the backup system — the absence of one. `off` renders as a
+ * grey "saved · local", which is true and reads as *fine*, when what it
+ * actually means is that this browser holds the only copy of the user's job
+ * hunt. Once there is real work to lose and no second copy anywhere, the
+ * badge should say so in a colour, because nothing else in the app will.
+ */
+const AT_RISK = {
+  text: "1 copy only",
+  color: "var(--warn)",
+  title: "This browser holds the only copy — click to set up a backup",
+};
+
+/** Long enough that an occasional exporter is left alone, short enough to matter. */
+const STALE_DAYS = 7;
 
 const TABS = [
   { href: "/", key: "nav_resume" as const },
@@ -33,7 +49,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const t = useT();
   const { theme, setTheme, hydrated } = useStore();
+  const ownWorkAt = useStore((s) => s.ownWorkAt);
   const status = useBackup((b) => b.status);
+  const lastExportAt = useBackup((b) => b.lastExportAt);
+
+  // no file connected, nothing exported lately, and something worth losing
+  const exported = daysSince(lastExportAt);
+  const atRisk =
+    (status === "off" || status === "unsupported") &&
+    !!ownWorkAt &&
+    (exported === null || exported >= STALE_DAYS);
+  const badge = atRisk ? AT_RISK : (SAVED_AS[status] ?? SAVED_AS.off);
 
   useEffect(() => {
     const el = document.documentElement;
@@ -81,10 +107,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/data"
             className="mono text-[10.5px]"
-            style={{ color: hydrated ? (SAVED_AS[status] ?? SAVED_AS.off).color : "var(--faint)" }}
-            title="Where your data is kept"
+            style={{ color: hydrated ? badge.color : "var(--faint)" }}
+            title={hydrated ? badge.title : "Where your data is kept"}
           >
-            {hydrated ? (SAVED_AS[status] ?? SAVED_AS.off).text : "loading…"}
+            {hydrated ? badge.text : "loading…"}
           </Link>
           <UndoButton />
           {/* language lives on the Data page — it is a set-once choice, not a toggle */}

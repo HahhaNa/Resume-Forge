@@ -43,6 +43,19 @@ interface Store extends UI {
   db: DB;
   hydrated: boolean;
 
+  /**
+   * When we first saw the user change something of their own — empty until
+   * then. This is the difference between someone poking at the demo and
+   * someone an evening into their real résumé, and it is the only thing that
+   * makes it safe to warn about a missing backup: nagging a stranger who is
+   * still looking around is how you get the tab closed.
+   *
+   * Set once by `step()` and never cleared. Not a precise "first edit" for
+   * installs that predate it — see `onRehydrateStorage`, which infers it from
+   * the data rather than pretending a full library is untouched.
+   */
+  ownWorkAt: string;
+
   setLang: (l: Lang) => void;
   setTheme: (t: UI["theme"]) => void;
   setActiveVariant: (id: string) => void;
@@ -137,6 +150,18 @@ interface Store extends UI {
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
+/**
+ * Is this still the demo? Only ever asked once, of an install that predates
+ * `ownWorkAt`, and only to decide whether to warn about a missing backup — so
+ * three cheap signals beat a deep comparison against SEED. Wrong in the safe
+ * direction either way: a false "untouched" costs one edit before the warning
+ * appears, and a false "touched" shows a backup prompt a little early.
+ */
+const looksUntouched = (db: DB) =>
+  db.applications.length === 0 &&
+  db.entries.length === SEED.entries.length &&
+  db.profile.name === SEED.profile.name;
+
 /** A restore point for the database as it stands, newest first, oldest trimmed. */
 const withRestorePoint = (s: { db: DB; restorePoints: RestorePoint[] }, label: string) =>
   [{ id: uid("rp"), at: stamp(), label, db: clone(s.db) }, ...s.restorePoints].slice(
@@ -176,6 +201,9 @@ const step =
       coalesce !== undefined && head?.coalesce === coalesce && Date.now() - head.at < UNDO_COALESCE_MS;
     return {
       ...patch,
+      // every database change in the app comes through here, so this is the
+      // one place that needs to know the demo has become someone's own work
+      ownWorkAt: s.ownWorkAt || stamp(),
       past: extend ? s.past : [stepOf(s, label, coalesce), ...s.past].slice(0, MAX_UNDO),
       // a fresh edit is a new branch: whatever redo was holding is unreachable now
       future: [],
@@ -231,6 +259,7 @@ export const useStore = create<Store>()(
     (set, get) => ({
       db: clone(SEED),
       hydrated: false,
+      ownWorkAt: "",
       lang: "en",
       theme: "system",
       activeVariantId: SEED.variants[0].id,
@@ -1104,12 +1133,13 @@ export const useStore = create<Store>()(
       name: "resume-forge",
       version: 2,
       /** The undo stacks are per-session; see UndoStep in types.ts. */
-      partialize: ({ db, restorePoints, lang, theme, activeVariantId }) => ({
+      partialize: ({ db, restorePoints, lang, theme, activeVariantId, ownWorkAt }) => ({
         db,
         restorePoints,
         lang,
         theme,
         activeVariantId,
+        ownWorkAt,
       }),
       /** v1 had no tag vocabulary and no restore points: recover the former from the data. */
       migrate: (persisted, from) => {
@@ -1130,7 +1160,12 @@ export const useStore = create<Store>()(
         return s as Store;
       },
       onRehydrateStorage: () => (state) => {
-        if (state) state.hydrated = true;
+        if (!state) return;
+        state.hydrated = true;
+        // Installs from before this field existed would look untouched forever,
+        // because nothing back-dates it. Infer it from the data instead: a
+        // library that no longer matches the seed is somebody's actual work.
+        if (!state.ownWorkAt && !looksUntouched(state.db)) state.ownWorkAt = stamp();
       },
     }
   )

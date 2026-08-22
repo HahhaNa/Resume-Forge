@@ -1,0 +1,256 @@
+# Resume Forge — user guide
+
+The [README](../README.md) gets you to a first résumé. This is the rest: what every tab does, and
+the handful of rules that aren't obvious from looking at the screen.
+
+- [Resume](#resume)
+- [Library](#library)
+- [Applications](#applications)
+- [Practice](#practice)
+- [Data](#data)
+- [Undo](#undo)
+- [A Chinese résumé](#a-chinese-résumé)
+
+---
+
+## Resume
+
+The left pane is the variant you are editing; the right pane is a live, page-accurate preview.
+
+**Variants** are named presets — `hw`, `ml`, `sw` ship by default. A variant is nothing but an
+ordered list of sections, the entries inside each section, and the set of bullets that are ticked.
+Duplicating one costs nothing.
+
+**Bullets are shared.** Every variant reads from the same library, so fixing a typo or updating a
+number fixes it everywhere. Tick a box to include a bullet in the variant you are editing. To put
+one entry into several variants at once, use the [Library](#library) tab.
+
+**Tags** are your own vocabulary, edited in the Data tab — the demo ships `hw` / `ml` / `sw` / `tw`,
+but rename or replace them and every bullet carrying the old name follows. They are a shortcut, not
+a rule: `Tagged /hw` selects every bullet in that entry carrying the current variant's tag; `All`
+and `None` do the obvious thing. A variant named after a tag shares its colour.
+
+**`**bold**` inside bullet text** becomes `\textbf{}` in LaTeX and bold in the preview. Use it on
+the number that matters, not on whole sentences.
+
+**An entry with zero ticked bullets disappears** from the output. That is deliberate — it is how you
+drop a project from one variant without deleting it.
+
+**Page fill** is calibrated against real `pdflatex` output, so `0.94 / 1` means it genuinely compiles
+to one page and `1.03 / 1` means it genuinely spills. Trim until it goes blue.
+
+**Density / font size** are the last resort, not the first. Cut a bullet before you shrink type.
+
+**⇄ Compare** puts this variant next to another one and shows only where they disagree — entries one
+carries and the other does not, and, for the entries both carry, the bullets each one ticks alone.
+What they share is a single number at the top. This is the view for tailoring the second résumé,
+when the question is "what does `/ml` say that `/hw` doesn't".
+
+### Getting it out
+
+- **`Copy .tex` / `Download .tex`** — the LaTeX source. This is the one to send.
+- **`Open in Overleaf`** — posts the source straight into a new [Overleaf](https://www.overleaf.com)
+  project. It compiles with pdfLaTeX as-is; you don't have to install anything.
+- **`Print / Save PDF`** — renders the on-screen preview from the browser. Fine for a quick look,
+  but the LaTeX output is the one to send.
+- **`Copy text`** — for the other thing application forms ask for: the "or paste your résumé here"
+  box. Copying out of the PDF interleaves the two columns into nonsense, so this generates the same
+  résumé as plain text — no columns, no tabs, no bold markers, hyphens for bullets, section titles
+  in caps.
+
+The generated `.tex` is self-contained: preamble, macros, and content in one file, with the variant
+name, build date, and the list of included bullet ids in a header comment.
+
+---
+
+## Library
+
+The Resume tab shows one variant at a time, which makes adding a new experience feel like it has to
+be done once per résumé. It does not. Entries and bullets live once in the library and a variant
+only holds references, so this tab is that library seen from above: every entry down the side, every
+variant across the top, one cell for each pair.
+
+**A cell is a reference, not a copy.** Ticking a cell files that entry into that variant — editing
+the text anywhere changes it everywhere, because there is only one copy.
+
+**`⊕` on a row puts the entry in every variant at once**, and `⊖` takes it out of all of them. That
+is the answer to "I just did a new internship and there are five résumés".
+
+**The cell reads `2/5`** — bullets switched on, out of bullets the entry has. A dashed `+` means the
+variant does not carry it at all.
+
+**An amber `0/5` is the trap worth knowing**: the entry is filed in that variant but no bullet is
+ticked, so it gets dropped and silently will not print. Expand the row and tick one. Education and
+awards are exempt — they print with no bullets.
+
+**Adding to a variant picks the section for you**: the same-titled section that holds it in another
+variant, else the section already full of that kind, else a new one named after the kind. Order is
+mirrored from a variant that already lists it, so a fresh add is not stranded at the bottom. Bullets
+tagged with the variant's slug switch on; if none carry the tag, all do.
+
+**Expand a row** to get the bullets, with a checkbox per variant. Ticking a bullet in a variant that
+does not carry the entry pulls the entry in too, rather than leaving a tick that renders nothing.
+
+**`Missing somewhere` and `In no variant`** are the two filters that matter: the first is what you
+have not finished distributing, the second is what you wrote and then forgot entirely.
+
+The bottom row is what each variant actually renders — entries and bullets after the empty ones are
+dropped.
+
+The same variant checkboxes are on the ✎ entry editor, so a new entry can be pushed to every résumé
+without leaving the Resume tab.
+
+---
+
+## Applications
+
+The quick-add row is the normal way in: paste the job link and the company, and the application
+system (the "ATS") and often the role are read straight out of the URL — Greenhouse, Lever, Ashby,
+Workday, Workable, SmartRecruiters, Taleo, iCIMS, Cake and a dozen more, plus the company's own
+careers page as a fallback. Nothing is fetched; the company name is simply in the path. Fill in what
+is missing, press Enter, done.
+
+The full form is still behind ✎ when you want the portal, the referral and the next-action date, and
+it keeps the rarely-used half folded away under "More details".
+
+**The snapshot is taken for you.** Every row records which variant you used, and the first time an
+application moves out of `saved`, the exact `.tex` and the exact list of bullet ids are frozen onto
+that row. Moving it further down the funnel never overwrites that — what was sent was sent. Change
+your résumé as much as you like afterwards; the snapshot still shows what that company received.
+**Lock snapshot** is still there by hand, for rows that predate the automatic one.
+
+The funnel, the response rate, and the per-variant comparison are computed from the rows, so once
+you have twenty applications you can see whether `hw` or `ml` is actually getting callbacks.
+
+`Prep topics` on an application feeds the [Practice](#practice) tab.
+
+---
+
+## Practice
+
+Platforms are user-defined — LeetCode, NeetCode, Deep-ML, and HDLBits are seeded, but the
+`+ Add platform` button takes anything (name, URL, kind, target count, colour). Progress, activity,
+and the review queue all aggregate across platforms.
+
+### Deep-ML is wired to the real catalogues
+
+All four of them, not just `/problems`:
+
+| | count | url |
+|---|---|---|
+| problems | ~1230 | `/problems/<id>` |
+| project steps | ~1000 | `/projects/<project>/step/<step>` |
+| maths | ~31 | `/math-problems/<id>` |
+| labs | ~38 | `/labs/<id>` |
+
+Press `Sync catalogue` once and the quick-add box becomes a search over all of it: type an id, a few
+words of the title, the project name — or **paste the Deep-ML link you have open**, which resolves to
+exactly that item. Press Enter and the ref, title, URL, difficulty and category all come from
+Deep-ML. Steps are stored as `Project name · step name` so a row still means something on its own.
+Refs are namespaced (`M1`, `L1`) so the four catalogues cannot collide.
+
+The catalogue is cached in its own browser-storage key, outside your exported JSON. What it cannot
+know is which items you have *finished* — that sits behind Deep-ML's login — so ticking them off is
+still your call. No other platform publishes a usable open endpoint; they stay manual.
+
+### The rest
+
+**Bulk paste** takes `ref | title | difficulty | topic, topic` one per line — the fastest way to
+backfill what you have already solved. On Deep-ML a bare ref or a pasted link on its own line is
+enough.
+
+**Gaps vs. your active applications** cross-references the topics you listed on open applications
+against what you have actually practiced, sorted by what you have practiced least. This is the point
+of putting the two trackers in the same app.
+
+**Review queue** uses simple spaced repetition (1 / 3 / 7 / 16 / 35 days by how the attempt felt).
+
+---
+
+## Data
+
+Profile fields, the tag vocabulary, the backup file, JSON export/import, and reset. The exported
+JSON is the whole database, so importing it on another machine moves everything.
+
+### Backup file
+
+Browser storage is not a backup: it belongs to one web address and any cleanup takes it with it.
+Press `Choose a backup file`, put the file somewhere that syncs — iCloud Drive, Dropbox, a
+git-tracked folder — and every edit is written to it a second later. The header says `saved · file`
+once it is running.
+
+This needs the File System Access API, so **Chrome and Edge only**; Safari and Firefox show the
+manual export with a warning once it goes a week without one.
+
+That file is also how two machines share a job hunt. Each one connects to the same synced file, and
+on launch the app compares the file against what that browser holds:
+
+- same, or the file is empty → backup resumes silently
+- different → writing **stops** and you pick, with the entry and application counts of each side
+  shown on the buttons
+
+It never merges and it never picks for you. Two machines editing between syncs is a genuine fork,
+and the only way to actually lose work here would be to guess at it.
+
+### Importing a résumé
+
+Three destinations, because "I already have a résumé" usually does not mean "start my library over":
+
+- **Replace /hw** — the common one, and the default. Keeps your library and every other variant;
+  only the variant you are standing on changes, and it keeps its own slug, label, density and page
+  target. Use this when the import *is* what that one variant should say.
+- **Add to my library** — files the import alongside what you have, under a new variant.
+- **Replace everything** — throws the library away. It asks first, and it is rarely what you want.
+
+All three take a restore point, and all three are one Undo away.
+
+### Restore points
+
+Importing a résumé with "Replace everything" throws away the current entries, skills and variants —
+so a copy of the whole database is taken first, and the same goes for a JSON import, a reset, and any
+deletion that carries a lot with it: an entry and its bullets, a variant, a platform and its solve
+log, a tag. Undo is offered on the spot when the import finishes, and the last twelve points stay
+listed here with a timestamp and what each one holds. Restoring is itself undoable: whatever was on
+screen becomes a point of its own.
+
+---
+
+## Undo
+
+Every change to the database is undoable — ⌘Z / Ctrl+Z, the ↺ in the header, or the Undo on the toast
+that appears when something is deleted. ⇧⌘Z redoes.
+
+Inside a text box the shortcut stays the browser's, so it walks back through your typing the way it
+does everywhere else; ours takes over where the last thing that happened was a click. A run of edits
+to one field counts as one step, not one per keystroke.
+
+The history is per-session and holds sixty steps. It lives in memory rather than in browser storage,
+where each step would be re-serialised in full on every keystroke — undo is for the mistake you
+notice now, and the restore points above are for the one you notice tomorrow.
+
+---
+
+## A Chinese résumé
+
+The LaTeX generator emits pdfLaTeX-compatible source, which will not typeset CJK. For a Chinese
+variant, export the `.tex` and swap the preamble's font setup for:
+
+```tex
+\usepackage{xeCJK}
+\setCJKmainfont{PingFang TC}
+```
+
+then compile with XeLaTeX (in Overleaf: Menu → Compiler → XeLaTeX). Keep the Chinese bullets in the
+same library with a `tw` tag so the two languages stay in sync.
+
+---
+
+## Notes for people changing the code
+
+- Colours come from a colourblind-checked palette; light and dark are separately chosen, not flipped.
+- The preview calibration constant lives at the top of `components/resume/Preview.tsx`. If you change
+  the LaTeX preamble's spacing, recompile a variant and re-measure.
+- `resolve()` in `lib/resume.ts` is the single source of truth: the preview and the LaTeX generator
+  both read from it, so what you see is what compiles.
+
+See [architecture.md](architecture.md) for the data model and the roadmap.

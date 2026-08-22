@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useStore } from "@/lib/store";
+import { useStore, type ImportMode } from "@/lib/store";
 import { useT, type K } from "@/lib/i18n";
 import { Modal } from "@/components/ui/bits";
 import { richHtmlParts } from "@/lib/resume";
@@ -13,7 +13,7 @@ type Phase =
   | { k: "ready"; draft: Draft; file: string }
   | { k: "error"; msg: string }
   /** Import applied. Held open on purpose so undo is one click, not a hunt. */
-  | { k: "done"; mode: "replace" | "append"; entries: number; restorePointId: string };
+  | { k: "done"; mode: ImportMode; entries: number; restorePointId: string; slug: string };
 
 export default function ImportResume({ open, onClose }: { open: boolean; onClose: () => void }) {
   const s = useStore();
@@ -75,13 +75,18 @@ export default function ImportResume({ open, onClose }: { open: boolean; onClose
       .filter((sec) => (sec.type === "skills" ? sec.skills.length : sec.entries.length)),
   });
 
-  const run = (mode: "replace" | "append") => {
+  /** The variant "Replace /…" is aimed at — the one on screen behind this modal. */
+  const active = s.db.variants.find((v) => v.id === s.activeVariantId);
+
+  const run = (mode: ImportMode) => {
     if (phase.k !== "ready") return;
     const draft = trim(phase.draft);
     if (!draft.sections.length) return;
+    // only the blunt one asks: retargeting a single variant is one undo away, and the
+    // button already says which variant it is about
     if (mode === "replace" && !confirm(t("importReplaceConfirm"))) return;
     const { entries, restorePointId } = s.importDraft(draft, mode, phase.file);
-    setPhase({ k: "done", mode, entries, restorePointId });
+    setPhase({ k: "done", mode, entries, restorePointId, slug: active?.name ?? "" });
   };
 
   const toggle = (key: string) =>
@@ -100,7 +105,11 @@ export default function ImportResume({ open, onClose }: { open: boolean; onClose
             style={{ background: "var(--accent-soft)", border: "1px solid var(--accent-line)" }}
           >
             <div className="text-[13px] font-medium">
-              {phase.mode === "replace" ? t("importedReplaced") : t("importedAppended")}
+              {phase.mode === "replace"
+                ? t("importedReplaced")
+                : phase.mode === "variant"
+                  ? t("importedVariant").replace("{n}", phase.slug)
+                  : t("importedAppended")}
             </div>
             <div className="mono mt-1 text-[11px]" style={{ color: "var(--ink2)" }}>
               {phase.entries} {phase.entries === 1 ? "entry" : "entries"}
@@ -132,6 +141,7 @@ export default function ImportResume({ open, onClose }: { open: boolean; onClose
           toggle={toggle}
           onBack={() => setPhase({ k: "idle" })}
           onRun={run}
+          slug={active?.name ?? ""}
           kept={draftStats(trim(phase.draft))}
         />
       ) : (
@@ -211,6 +221,7 @@ function Preview({
   toggle,
   onBack,
   onRun,
+  slug,
   kept,
 }: {
   draft: Draft;
@@ -218,11 +229,15 @@ function Preview({
   skip: Set<string>;
   toggle: (k: string) => void;
   onBack: () => void;
-  onRun: (mode: "replace" | "append") => void;
+  onRun: (mode: ImportMode) => void;
+  /** Empty when there is no variant to overwrite — the button hides rather than lying. */
+  slug: string;
   kept: { entries: number; bullets: number; skills: number };
 }) {
   const t = useT();
   const p = draft.profile;
+  /** Everything unticked — there is no import left to apply anywhere. */
+  const nothing = !kept.entries && !kept.skills;
 
   return (
     <div className="space-y-3">
@@ -332,20 +347,34 @@ function Preview({
         })}
       </div>
 
+      {/* Three destinations, ordered by how often they are the right one. Replacing the
+          whole library is the rare, blunt case, so it sits apart and reads as the danger it
+          is; retargeting the variant you are already on is the common one, so it is primary. */}
       <div className="flex flex-wrap items-center gap-2">
         <button className="btn" onClick={onBack}>
           ← {t("importAnother")}
         </button>
-        <button className="btn ml-auto" onClick={() => onRun("append")} disabled={!kept.entries && !kept.skills}>
-          {t("importAppend")}
-        </button>
         <button
-          className="btn btn-primary"
+          className="btn ml-auto"
+          style={{ color: "var(--crit)" }}
           onClick={() => onRun("replace")}
-          disabled={!kept.entries && !kept.skills}
+          disabled={nothing}
         >
           {t("importReplace")}
         </button>
+        <button className="btn" onClick={() => onRun("append")} disabled={nothing}>
+          {t("importAppend")}
+        </button>
+        {!!slug && (
+          <button
+            className="btn btn-primary"
+            title={t("importVariantHint").replace(/\{n\}/g, slug)}
+            onClick={() => onRun("variant")}
+            disabled={nothing}
+          >
+            {t("importVariant").replace("{n}", slug)}
+          </button>
+        )}
       </div>
     </div>
   );

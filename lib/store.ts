@@ -9,11 +9,13 @@ import {
   addSkillToVariant,
   removeFromVariant,
 } from "./library";
+import { buildTex } from "./resume";
 import type { Draft } from "./import";
 import type {
   Application,
   Bullet,
   DB,
+  Snapshot,
   Entry,
   Lang,
   Platform,
@@ -21,12 +23,15 @@ import type {
   Profile,
   RestorePoint,
   SkillGroup,
+  UndoStep,
   Variant,
 } from "./types";
-import { MAX_RESTORE_POINTS, REVIEW_INTERVALS } from "./types";
+import { MAX_RESTORE_POINTS, MAX_UNDO, REVIEW_INTERVALS, UNDO_COALESCE_MS } from "./types";
 
 export { uid, today };
 const stamp = () => new Date().toISOString();
+
+export type ImportMode = "replace" | "append" | "variant";
 
 interface UI {
   lang: Lang;
@@ -95,9 +100,14 @@ interface Store extends UI {
   moveTag: (name: string, dir: -1 | 1) => void;
 
   importDB: (db: DB) => void;
+  /**
+   * `append` files the import alongside what you have, under a new variant.
+   * `variant` keeps the whole library and rewrites only the variant you are on.
+   * `replace` throws the library away — the blunt one, and rarely the one you want.
+   */
   importDraft: (
     draft: Draft,
-    mode: "replace" | "append",
+    mode: ImportMode,
     sourceName?: string
   ) => { variantId: string; entries: number; restorePointId: string };
   resetDB: () => void;
@@ -106,6 +116,23 @@ interface Store extends UI {
   restorePoints: RestorePoint[];
   restore: (id: string) => boolean;
   dropRestorePoint: (id: string) => void;
+
+  /* ---- undo ---------------------------------------------------------- *
+   * Every action that changes the database is undoable. The two stacks hold
+   * the database on either side of where you are standing: `past[0]` is what
+   * Cmd-Z puts back, `future[0]` is what Shift-Cmd-Z puts back after that.
+   * See UndoStep in types.ts for why they are cheap and why they are not
+   * persisted. */
+  past: UndoStep[];
+  future: UndoStep[];
+  /**
+   * The last thing worth telling the user about — a deletion, or any action
+   * they just undid. The toast reads this; everything else edits in silence.
+   */
+  notice: { id: string; label: string; undone: boolean } | null;
+  undo: () => boolean;
+  redo: () => boolean;
+  clearNotice: () => void;
 }
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
@@ -116,6 +143,86 @@ const withRestorePoint = (s: { db: DB; restorePoints: RestorePoint[] }, label: s
     0,
     MAX_RESTORE_POINTS
   );
+
+/** Where the database stands right now, ready to be pushed onto either stack. */
+const stepOf = (s: Store, label: string, coalesce?: string): UndoStep => ({
+  id: uid("u"),
+  at: Date.now(),
+  label,
+  coalesce,
+  db: s.db,
+  activeVariantId: s.activeVariantId,
+});
+
+/**
+ * Wraps a recipe so the database it replaces becomes an undo step.
+ *
+ * An action that decides it has nothing to do returns the state it was given, and
+ * a step whose database is the one already on screen would be an undo that does
+ * nothing — so identity is the test for "did anything happen".
+ *
+ * `coalesce` names the field being edited. Typing a bullet fires an action per
+ * keystroke, and a stack of those would make Cmd-Z walk back one character at a
+ * time, so consecutive edits to the same field within a second extend the step
+ * that is already there instead of pushing a new one.
+ */
+const step =
+  (label: string, recipe: (s: Store) => Partial<Store> | Store, coalesce?: string) =>
+  (s: Store): Partial<Store> => {
+    const patch = recipe(s) as Partial<Store>;
+    if (!patch.db || patch.db === s.db) return patch;
+    const head = s.past[0];
+    const extend =
+      coalesce !== undefined && head?.coalesce === coalesce && Date.now() - head.at < UNDO_COALESCE_MS;
+    return {
+      ...patch,
+      past: extend ? s.past : [stepOf(s, label, coalesce), ...s.past].slice(0, MAX_UNDO),
+      // a fresh edit is a new branch: whatever redo was holding is unreachable now
+      future: [],
+      // the toast undoes the top of the stack, so it may only outlive the action it
+      // is talking about for as long as that action stays on top
+      notice: null,
+    };
+  };
+
+/**
+ * A deletion. Undoable like any other action, and announced — the row is gone from
+ * under the cursor, and a toast offering Undo is the only thing that says so.
+ */
+const del = (label: string, recipe: (s: Store) => Partial<Store> | Store) => {
+  const inner = step(label, recipe);
+  return (s: Store): Partial<Store> => {
+    const patch = inner(s);
+    return patch.past ? { ...patch, notice: { id: uid("n"), label, undone: false } } : patch;
+  };
+};
+
+/**
+ * The résumé as it stands, frozen against an application.
+ *
+ * Taken the moment an application stops being a bookmark and becomes something you sent,
+ * because that is the only moment the answer is knowable. Six weeks later, walking into
+ * the interview, "which version did they read?" has no answer left in the data: the variant
+ * still exists but you have edited it four times since, for other companies. Waiting for
+ * the user to remember to press a button means the field is empty exactly when it matters.
+ *
+ * Returns undefined when the variant is gone, which is not worth failing the status change
+ * over — an application whose variant was deleted is precisely one you can no longer
+ * reconstruct, and blocking the edit would not bring it back.
+ */
+const snapshotOf = (db: DB, variantId: string): Snapshot | undefined => {
+  const v = db.variants.find((x) => x.id === variantId);
+  if (!v) return undefined;
+  return {
+    builtAt: stamp(),
+    variantName: v.name,
+    bulletIds: [...v.bulletIds],
+    tex: buildTex(db, v),
+  };
+};
+
+/** "Saved" is a bookmark; everything past it means the résumé left the building. */
+const isSent = (st: Application["status"]) => st !== "saved";
 
 export const normTag = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 12);
 
@@ -132,11 +239,18 @@ export const useStore = create<Store>()(
       setTheme: (theme) => set({ theme }),
       setActiveVariant: (activeVariantId) => set({ activeVariantId }),
 
-      patchProfile: (p) => set((s) => ({ db: { ...s.db, profile: { ...s.db.profile, ...p } } })),
+      patchProfile: (p) =>
+        set(
+          step(
+            "Profile edited",
+            (s) => ({ db: { ...s.db, profile: { ...s.db.profile, ...p } } }),
+            `profile:${Object.keys(p).join(",")}`
+          )
+        ),
 
       addEntry: (e) => {
         const id = uid("e");
-        set((s) => ({
+        set(step("Entry added", (s) => ({
           db: {
             ...s.db,
             entries: [
@@ -154,15 +268,26 @@ export const useStore = create<Store>()(
               } as Entry,
             ],
           },
-        }));
+        })));
         return id;
       },
       patchEntry: (id, e) =>
-        set((s) => ({
-          db: { ...s.db, entries: s.db.entries.map((x) => (x.id === id ? { ...x, ...e } : x)) },
-        })),
+        set(
+          step(
+            "Entry edited",
+            (s) => ({
+              db: { ...s.db, entries: s.db.entries.map((x) => (x.id === id ? { ...x, ...e } : x)) },
+            }),
+            `entry:${id}:${Object.keys(e).join(",")}`
+          )
+        ),
       removeEntry: (id) =>
-        set((s) => ({
+        set(del("Entry deleted", (s) => ({
+          // an entry takes its bullets with it — worth a restore point of its own,
+          // because undo only reaches back as far as this session
+          restorePoints: s.db.entries.find((x) => x.id === id)?.bullets.length
+            ? withRestorePoint(s, "Before deleting an entry and its bullets")
+            : s.restorePoints,
           db: {
             ...s.db,
             entries: s.db.entries.filter((x) => x.id !== id),
@@ -171,33 +296,39 @@ export const useStore = create<Store>()(
               sections: v.sections.map((sec) => ({ ...sec, ids: sec.ids.filter((i) => i !== id) })),
             })),
           },
-        })),
+        }))),
 
       addBullet: (entryId, text = "") => {
         const id = uid("b");
-        set((s) => ({
+        set(step("Bullet added", (s) => ({
           db: {
             ...s.db,
             entries: s.db.entries.map((e) =>
               e.id === entryId ? { ...e, bullets: [...e.bullets, { id, text, tags: [] }] } : e
             ),
           },
-        }));
+        })));
         return id;
       },
       patchBullet: (entryId, bulletId, b) =>
-        set((s) => ({
-          db: {
-            ...s.db,
-            entries: s.db.entries.map((e) =>
-              e.id === entryId
-                ? { ...e, bullets: e.bullets.map((x) => (x.id === bulletId ? { ...x, ...b } : x)) }
-                : e
-            ),
-          },
-        })),
+        set(
+          step(
+            "Bullet edited",
+            (s) => ({
+              db: {
+                ...s.db,
+                entries: s.db.entries.map((e) =>
+                  e.id === entryId
+                    ? { ...e, bullets: e.bullets.map((x) => (x.id === bulletId ? { ...x, ...b } : x)) }
+                    : e
+                ),
+              },
+            }),
+            `bullet:${bulletId}:${Object.keys(b).join(",")}`
+          )
+        ),
       removeBullet: (entryId, bulletId) =>
-        set((s) => ({
+        set(del("Bullet deleted", (s) => ({
           db: {
             ...s.db,
             entries: s.db.entries.map((e) =>
@@ -208,9 +339,9 @@ export const useStore = create<Store>()(
               bulletIds: v.bulletIds.filter((i) => i !== bulletId),
             })),
           },
-        })),
+        }))),
       moveBullet: (entryId, bulletId, dir) =>
-        set((s) => ({
+        set(step("Bullets reordered", (s) => ({
           db: {
             ...s.db,
             entries: s.db.entries.map((e) => {
@@ -223,24 +354,30 @@ export const useStore = create<Store>()(
               return { ...e, bullets: bs };
             }),
           },
-        })),
+        }))),
 
       addSkill: (sk) => {
         const id = uid("sk");
-        set((s) => ({
+        set(step("Skill group added", (s) => ({
           db: {
             ...s.db,
             skills: [...s.db.skills, { id, label: "New group", items: "", tags: [], ...sk }],
           },
-        }));
+        })));
         return id;
       },
       patchSkill: (id, sk) =>
-        set((s) => ({
-          db: { ...s.db, skills: s.db.skills.map((x) => (x.id === id ? { ...x, ...sk } : x)) },
-        })),
+        set(
+          step(
+            "Skill group edited",
+            (s) => ({
+              db: { ...s.db, skills: s.db.skills.map((x) => (x.id === id ? { ...x, ...sk } : x)) },
+            }),
+            `skill:${id}:${Object.keys(sk).join(",")}`
+          )
+        ),
       removeSkill: (id) =>
-        set((s) => ({
+        set(del("Skill group deleted", (s) => ({
           db: {
             ...s.db,
             skills: s.db.skills.filter((x) => x.id !== id),
@@ -249,7 +386,7 @@ export const useStore = create<Store>()(
               sections: v.sections.map((sec) => ({ ...sec, ids: sec.ids.filter((i) => i !== id) })),
             })),
           },
-        })),
+        }))),
 
       addVariant: (cloneFrom) => {
         const id = uid("v");
@@ -276,26 +413,43 @@ export const useStore = create<Store>()(
           label: `${base.label} (copy)`,
           updatedAt: stamp(),
         };
-        set((s) => ({ db: { ...s.db, variants: [...s.db.variants, v] }, activeVariantId: id }));
+        set(
+          step("Variant added", (s) => ({
+            db: { ...s.db, variants: [...s.db.variants, v] },
+            activeVariantId: id,
+          }))
+        );
         return id;
       },
       patchVariant: (id, v) =>
-        set((s) => ({
-          db: {
-            ...s.db,
-            variants: s.db.variants.map((x) => (x.id === id ? { ...x, ...v, updatedAt: stamp() } : x)),
-          },
-        })),
+        set(
+          step(
+            "Variant edited",
+            (s) => ({
+              db: {
+                ...s.db,
+                variants: s.db.variants.map((x) => (x.id === id ? { ...x, ...v, updatedAt: stamp() } : x)),
+              },
+            }),
+            `variant:${id}:${Object.keys(v).join(",")}`
+          )
+        ),
       removeVariant: (id) =>
-        set((s) => {
-          const variants = s.db.variants.filter((x) => x.id !== id);
-          return {
-            db: { ...s.db, variants },
-            activeVariantId: s.activeVariantId === id ? variants[0]?.id ?? "" : s.activeVariantId,
-          };
-        }),
+        set(
+          del("Variant deleted", (s) => {
+            const variants = s.db.variants.filter((x) => x.id !== id);
+            if (variants.length === s.db.variants.length) return s;
+            return {
+              // a variant is a whole layout's worth of choices; keep a copy that
+              // outlives the session, the way an import does
+              restorePoints: withRestorePoint(s, "Before deleting a variant"),
+              db: { ...s.db, variants },
+              activeVariantId: s.activeVariantId === id ? variants[0]?.id ?? "" : s.activeVariantId,
+            };
+          })
+        ),
       toggleBulletInVariant: (variantId, bulletId) =>
-        set((s) => ({
+        set(step("Bullet toggled", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) =>
@@ -310,9 +464,9 @@ export const useStore = create<Store>()(
                 : v
             ),
           },
-        })),
+        }))),
       setBulletsInVariant: (variantId, bulletIds, on) =>
-        set((s) => ({
+        set(step(on ? "Bullets added to the variant" : "Bullets removed from the variant", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) => {
@@ -322,9 +476,9 @@ export const useStore = create<Store>()(
               return { ...v, bulletIds: [...set2], updatedAt: stamp() };
             }),
           },
-        })),
+        }))),
       toggleEntryInVariant: (variantId, sectionId, entryId) =>
-        set((s) => ({
+        set(step("Entry toggled", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) =>
@@ -346,9 +500,9 @@ export const useStore = create<Store>()(
                 : v
             ),
           },
-        })),
+        }))),
       setEntryInVariant: (variantId, entryId, on) =>
-        set((s) => {
+        set(step(on ? "Entry added to the variant" : "Entry removed from the variant", (s) => {
           const entry = s.db.entries.find((e) => e.id === entryId);
           if (!entry) return s;
           return {
@@ -363,9 +517,9 @@ export const useStore = create<Store>()(
               }),
             },
           };
-        }),
+        })),
       setEntryEverywhere: (entryId, on) =>
-        set((s) => {
+        set(step(on ? "Entry added everywhere" : "Entry removed everywhere", (s) => {
           const entry = s.db.entries.find((e) => e.id === entryId);
           if (!entry) return s;
           return {
@@ -379,9 +533,9 @@ export const useStore = create<Store>()(
               }),
             },
           };
-        }),
+        })),
       setSkillInVariant: (variantId, skillId, on) =>
-        set((s) => ({
+        set(step(on ? "Skill group added to the variant" : "Skill group removed from the variant", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) => {
@@ -392,9 +546,9 @@ export const useStore = create<Store>()(
               return next === v ? v : { ...next, updatedAt: stamp() };
             }),
           },
-        })),
+        }))),
       setSkillEverywhere: (skillId, on) =>
-        set((s) => ({
+        set(step(on ? "Skill group added everywhere" : "Skill group removed everywhere", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) => {
@@ -404,9 +558,9 @@ export const useStore = create<Store>()(
               return next === v ? v : { ...next, updatedAt: stamp() };
             }),
           },
-        })),
+        }))),
       setBulletInVariant: (variantId, bulletId, on) =>
-        set((s) => {
+        set(step(on ? "Bullet added to the variant" : "Bullet removed from the variant", (s) => {
           const entry = s.db.entries.find((e) => e.bullets.some((b) => b.id === bulletId));
           if (!entry) return s;
           return {
@@ -428,9 +582,9 @@ export const useStore = create<Store>()(
               }),
             },
           };
-        }),
+        })),
       moveEntryInVariant: (variantId, sectionId, entryId, dir) =>
-        set((s) => ({
+        set(step("Entries reordered", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) => {
@@ -450,9 +604,9 @@ export const useStore = create<Store>()(
               };
             }),
           },
-        })),
+        }))),
       addSectionToVariant: (variantId, title, type) =>
-        set((s) => ({
+        set(step("Section added", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) =>
@@ -461,9 +615,9 @@ export const useStore = create<Store>()(
                 : v
             ),
           },
-        })),
+        }))),
       patchSection: (variantId, sectionId, patch) =>
-        set((s) => ({
+        set(step("Section edited", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) =>
@@ -476,9 +630,9 @@ export const useStore = create<Store>()(
                 : v
             ),
           },
-        })),
+        }), `section:${sectionId}:${Object.keys(patch).join(",")}`)),
       removeSection: (variantId, sectionId) =>
-        set((s) => ({
+        set(del("Section deleted", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) =>
@@ -487,9 +641,9 @@ export const useStore = create<Store>()(
                 : v
             ),
           },
-        })),
+        }))),
       moveSection: (variantId, sectionId, dir) =>
-        set((s) => ({
+        set(step("Sections reordered", (s) => ({
           db: {
             ...s.db,
             variants: s.db.variants.map((v) => {
@@ -502,12 +656,12 @@ export const useStore = create<Store>()(
               return { ...v, sections: secs, updatedAt: stamp() };
             }),
           },
-        })),
+        }))),
 
       addApplication: (a) => {
         const id = uid("a");
         const status = a.status ?? "saved";
-        set((s) => ({
+        set(step("Application added", (s) => ({
           db: {
             ...s.db,
             applications: [
@@ -532,15 +686,18 @@ export const useStore = create<Store>()(
                 prepTopics: [],
                 events: [{ at: today(), status }],
                 ...a,
+                snapshot:
+                  a.snapshot ??
+                  (isSent(status) ? snapshotOf(s.db, a.variantId ?? s.activeVariantId) : undefined),
               } as Application,
               ...s.db.applications,
             ],
           },
-        }));
+        })));
         return id;
       },
       patchApplication: (id, a) =>
-        set((s) => ({
+        set(step("Application edited", (s) => ({
           db: {
             ...s.db,
             applications: s.db.applications.map((x) => {
@@ -549,17 +706,25 @@ export const useStore = create<Store>()(
               if (a.status && a.status !== x.status) {
                 next.events = [...x.events, { at: today(), status: a.status }];
                 if (a.status === "applied" && !next.appliedAt) next.appliedAt = today();
+                // the first time it leaves "saved" — and only then, so a later move
+                // through the funnel never overwrites what was actually sent
+                if (!next.snapshot && isSent(a.status) && !isSent(x.status))
+                  next.snapshot = snapshotOf(s.db, next.variantId);
               }
               return next;
             }),
           },
-        })),
+        }), `application:${id}:${Object.keys(a).join(",")}`)),
       removeApplication: (id) =>
-        set((s) => ({ db: { ...s.db, applications: s.db.applications.filter((x) => x.id !== id) } })),
+        set(
+          del("Application deleted", (s) => ({
+            db: { ...s.db, applications: s.db.applications.filter((x) => x.id !== id) },
+          }))
+        ),
 
       addPlatform: (p) => {
         const id = uid("p");
-        set((s) => ({
+        set(step("Platform added", (s) => ({
           db: {
             ...s.db,
             platforms: [
@@ -567,25 +732,37 @@ export const useStore = create<Store>()(
               { id, name: "New platform", url: "", kind: "other", color: "s5", target: 0, ...p },
             ],
           },
-        }));
+        })));
         return id;
       },
       patchPlatform: (id, p) =>
-        set((s) => ({
-          db: { ...s.db, platforms: s.db.platforms.map((x) => (x.id === id ? { ...x, ...p } : x)) },
-        })),
+        set(
+          step(
+            "Platform edited",
+            (s) => ({
+              db: { ...s.db, platforms: s.db.platforms.map((x) => (x.id === id ? { ...x, ...p } : x)) },
+            }),
+            `platform:${id}:${Object.keys(p).join(",")}`
+          )
+        ),
       removePlatform: (id) =>
-        set((s) => ({
-          db: {
-            ...s.db,
-            platforms: s.db.platforms.filter((x) => x.id !== id),
-            problems: s.db.problems.filter((x) => x.platformId !== id),
-          },
-        })),
+        set(
+          del("Platform deleted", (s) => ({
+            // the platform's whole solve log goes with it
+            restorePoints: s.db.problems.some((x) => x.platformId === id)
+              ? withRestorePoint(s, "Before deleting a platform and its problems")
+              : s.restorePoints,
+            db: {
+              ...s.db,
+              platforms: s.db.platforms.filter((x) => x.id !== id),
+              problems: s.db.problems.filter((x) => x.platformId !== id),
+            },
+          }))
+        ),
 
       addProblem: (p) => {
         const id = uid("q");
-        set((s) => ({
+        set(step("Problem added", (s) => ({
           db: {
             ...s.db,
             problems: [
@@ -608,17 +785,27 @@ export const useStore = create<Store>()(
               ...s.db.problems,
             ],
           },
-        }));
+        })));
         return id;
       },
       patchProblem: (id, p) =>
-        set((s) => ({
-          db: { ...s.db, problems: s.db.problems.map((x) => (x.id === id ? { ...x, ...p } : x)) },
-        })),
+        set(
+          step(
+            "Problem edited",
+            (s) => ({
+              db: { ...s.db, problems: s.db.problems.map((x) => (x.id === id ? { ...x, ...p } : x)) },
+            }),
+            `problem:${id}:${Object.keys(p).join(",")}`
+          )
+        ),
       removeProblem: (id) =>
-        set((s) => ({ db: { ...s.db, problems: s.db.problems.filter((x) => x.id !== id) } })),
+        set(
+          del("Problem deleted", (s) => ({
+            db: { ...s.db, problems: s.db.problems.filter((x) => x.id !== id) },
+          }))
+        ),
       gradeProblem: (id, confidence) =>
-        set((s) => ({
+        set(step("Problem graded", (s) => ({
           db: {
             ...s.db,
             problems: s.db.problems.map((x) => {
@@ -635,7 +822,7 @@ export const useStore = create<Store>()(
               };
             }),
           },
-        })),
+        }))),
 
       /* ---- tags -------------------------------------------------------- *
        * The vocabulary is the user's, not the app's. Bullets, entries and
@@ -645,13 +832,17 @@ export const useStore = create<Store>()(
       addTag: (name) => {
         const tag = normTag(name);
         if (!tag) return;
-        set((s) => (s.db.tags.includes(tag) ? s : { db: { ...s.db, tags: [...s.db.tags, tag] } }));
+        set(
+          step("Tag added", (s) =>
+            s.db.tags.includes(tag) ? s : { db: { ...s.db, tags: [...s.db.tags, tag] } }
+          )
+        );
       },
 
       renameTag: (from, to) => {
         const tag = normTag(to);
         if (!tag || tag === from) return;
-        set((s) => {
+        set(step("Tag renamed", (s) => {
           if (!s.db.tags.includes(from) || s.db.tags.includes(tag)) return s;
           const swap = (xs: string[]) => xs.map((x) => (x === from ? tag : x));
           return {
@@ -668,13 +859,17 @@ export const useStore = create<Store>()(
               variants: s.db.variants.map((v) => (v.name === from ? { ...v, name: tag } : v)),
             },
           };
-        });
+        }));
       },
 
       removeTag: (name) =>
-        set((s) => {
+        set(del("Tag deleted", (s) => {
+          if (!s.db.tags.includes(name)) return s;
           const drop = (xs: string[]) => xs.filter((x) => x !== name);
           return {
+            // the tag is stripped from every bullet, entry and skill group that
+            // carries it — too wide a change to leave to this session's undo alone
+            restorePoints: withRestorePoint(s, `Before deleting the tag "${name}"`),
             db: {
               ...s.db,
               tags: drop(s.db.tags),
@@ -686,31 +881,47 @@ export const useStore = create<Store>()(
               skills: s.db.skills.map((k) => ({ ...k, tags: drop(k.tags) })),
             },
           };
-        }),
+        })),
 
       moveTag: (name, dir) =>
-        set((s) => {
+        set(step("Tags reordered", (s) => {
           const i = s.db.tags.indexOf(name);
           const j = i + dir;
           if (i < 0 || j < 0 || j >= s.db.tags.length) return s;
           const tags = [...s.db.tags];
           [tags[i], tags[j]] = [tags[j], tags[i]];
           return { db: { ...s.db, tags } };
-        }),
-
-      importDB: (db) =>
-        set((s) => ({
-          restorePoints: withRestorePoint(s, "Before importing a JSON backup"),
-          db,
-          activeVariantId: db.variants[0]?.id ?? "",
         })),
 
+      importDB: (db) =>
+        set(
+          step("Backup imported", (s) => ({
+            restorePoints: withRestorePoint(s, "Before importing a JSON backup"),
+            db,
+            activeVariantId: db.variants[0]?.id ?? "",
+          }))
+        ),
+
       /**
-       * Turn a parsed .tex/.pdf draft into entries, skills and a variant that shows all of it.
-       * "replace" throws the current library away, so it takes a restore point first.
+       * Turn a parsed .tex/.pdf draft into entries, skills, and a variant that shows all of it.
+       *
+       * Which variant depends on the mode, and `variant` is the one worth explaining. Importing
+       * a résumé you already wrote is usually not "here is my whole career, start over" — it is
+       * "this is what /hw should say". So that mode adds the parsed entries to the library like
+       * an append, and then repoints the variant you are standing on at them: the slug, the
+       * label, the density and the page target all survive, because they are the part you tuned
+       * and the import knows nothing about. Nothing is deleted — entries the variant used to
+       * list are still in the library, and the Library tab's "In no variant" filter is where
+       * they show up if nothing else carries them.
+       *
+       * All three modes take a restore point: `variant` and `replace` because they overwrite a
+       * selection, `append` because an import you did not mean is easiest to undo wholesale.
        */
       importDraft: (draft, mode, sourceName) => {
         const st = get();
+        // no variant to stand on — nothing to overwrite, so make one the way `append` does
+        const target = mode === "variant" ? st.db.variants.find((v) => v.id === st.activeVariantId) : undefined;
+        const into: ImportMode = mode === "variant" && !target ? "append" : mode;
         const entries: Entry[] = [];
         const skills: SkillGroup[] = [];
         const sections: Variant["sections"] = [];
@@ -747,36 +958,57 @@ export const useStore = create<Store>()(
           sections.push({ id: uid("s"), title: sec.title, type: "entries", ids });
         });
 
-        const suffix = mode === "append" ? `-${st.db.variants.length + 1}` : "";
-        const variant: Variant = {
-          id: uid("v"),
-          name: `imported${suffix}`,
-          label: `Imported (${draft.source.toUpperCase()})`,
-          note: "",
-          sections,
-          bulletIds,
-          header: { phone: true, linkedin: true, github: true, site: false },
-          density: "tight",
-          fontSize: 10,
-          pageTarget: 1,
-          updatedAt: stamp(),
-        };
+        const suffix = into === "append" ? `-${st.db.variants.length + 1}` : "";
+        // in `variant` mode the target keeps everything but its contents
+        const variant: Variant =
+          into === "variant" && target
+            ? { ...target, sections, bulletIds, updatedAt: stamp() }
+            : {
+                id: uid("v"),
+                name: `imported${suffix}`,
+                label: `Imported (${draft.source.toUpperCase()})`,
+                note: "",
+                sections,
+                bulletIds,
+                header: { phone: true, linkedin: true, github: true, site: false },
+                density: "tight",
+                fontSize: 10,
+                pageTarget: 1,
+                updatedAt: stamp(),
+              };
 
-        // only touch profile fields the draft actually found; appending never clobbers
+        // only touch profile fields the draft actually found, and only overwrite a filled one
+        // when the whole library is going: retargeting one variant is not a change of identity
         const profile: Profile = { ...st.db.profile };
         (Object.keys(draft.profile) as (keyof Profile)[]).forEach((k) => {
           const v = draft.profile[k]?.trim();
-          if (v && (mode === "replace" || !profile[k])) profile[k] = v;
+          if (v && (into === "replace" || !profile[k])) profile[k] = v;
         });
 
+        const label =
+          into === "replace"
+            ? "Everything replaced by an import"
+            : into === "variant"
+              ? `Variant /${variant.name} replaced by an import`
+              : "Résumé imported";
+
         let restorePointId = "";
-        set((s) => {
-          const variants = mode === "replace" ? [variant] : [...s.db.variants, variant];
+        set(step(label, (s) => {
+          const variants =
+            into === "replace"
+              ? [variant]
+              : into === "variant"
+                ? s.db.variants.map((v) => (v.id === variant.id ? variant : v))
+                : [...s.db.variants, variant];
           const live = new Set(variants.map((v) => v.id));
           const what = sourceName ? `"${sourceName}"` : `a ${draft.source.toUpperCase()} file`;
           const restorePoints = withRestorePoint(
             s,
-            mode === "replace" ? `Before replacing everything with ${what}` : `Before importing ${what}`
+            into === "replace"
+              ? `Before replacing everything with ${what}`
+              : into === "variant"
+                ? `Before replacing /${variant.name} with ${what}`
+                : `Before importing ${what}`
           );
           restorePointId = restorePoints[0].id;
           return {
@@ -784,8 +1016,9 @@ export const useStore = create<Store>()(
             db: {
               ...s.db,
               profile,
-              entries: mode === "replace" ? entries : [...s.db.entries, ...entries],
-              skills: mode === "replace" ? skills : [...s.db.skills, ...skills],
+              // only `replace` drops what was there; the other two keep the library whole
+              entries: into === "replace" ? entries : [...s.db.entries, ...entries],
+              skills: into === "replace" ? skills : [...s.db.skills, ...skills],
               variants,
               // replace drops the old variants — keep applications pointing somewhere real
               applications: s.db.applications.map((a) =>
@@ -794,41 +1027,90 @@ export const useStore = create<Store>()(
             },
             activeVariantId: variant.id,
           };
-        });
+        }));
 
         return { variantId: variant.id, entries: entries.length, restorePointId };
       },
 
       resetDB: () =>
-        set((s) => ({
-          restorePoints: withRestorePoint(s, "Before resetting to the demo content"),
-          db: clone(SEED),
-          activeVariantId: SEED.variants[0].id,
-        })),
+        set(
+          step("Reset to the demo content", (s) => ({
+            restorePoints: withRestorePoint(s, "Before resetting to the demo content"),
+            db: clone(SEED),
+            activeVariantId: SEED.variants[0].id,
+          }))
+        ),
 
       restorePoints: [],
 
       /** Restoring is itself undoable — the database being replaced becomes a point too. */
       restore: (id) => {
-        const s = get();
-        const rp = s.restorePoints.find((x) => x.id === id);
+        const rp = get().restorePoints.find((x) => x.id === id);
         if (!rp) return false;
-        set({
-          restorePoints: withRestorePoint(s, `Before restoring "${rp.label}"`).filter(
-            (x) => x.id !== id
-          ),
-          db: clone(rp.db),
-          activeVariantId: rp.db.variants[0]?.id ?? "",
-        });
+        set(
+          step("Restore point restored", (s) => ({
+            restorePoints: withRestorePoint(s, `Before restoring "${rp.label}"`).filter(
+              (x) => x.id !== id
+            ),
+            db: clone(rp.db),
+            activeVariantId: rp.db.variants[0]?.id ?? "",
+          }))
+        );
         return true;
       },
 
       dropRestorePoint: (id) =>
         set((s) => ({ restorePoints: s.restorePoints.filter((x) => x.id !== id) })),
+
+      past: [],
+      future: [],
+      notice: null,
+
+      /**
+       * Step back. The database on screen goes onto the redo stack under the label
+       * of the action being reversed, so the toast can offer it back by name.
+       */
+      undo: () => {
+        const s = get();
+        const back = s.past[0];
+        if (!back) return false;
+        set({
+          db: back.db,
+          activeVariantId: back.activeVariantId,
+          past: s.past.slice(1),
+          future: [{ ...stepOf(s, back.label), id: back.id }, ...s.future].slice(0, MAX_UNDO),
+          notice: { id: uid("n"), label: back.label, undone: true },
+        });
+        return true;
+      },
+
+      redo: () => {
+        const s = get();
+        const forward = s.future[0];
+        if (!forward) return false;
+        set({
+          db: forward.db,
+          activeVariantId: forward.activeVariantId,
+          past: [{ ...stepOf(s, forward.label), id: forward.id }, ...s.past].slice(0, MAX_UNDO),
+          future: s.future.slice(1),
+          notice: { id: uid("n"), label: forward.label, undone: false },
+        });
+        return true;
+      },
+
+      clearNotice: () => set({ notice: null }),
     }),
     {
       name: "resume-forge",
       version: 2,
+      /** The undo stacks are per-session; see UndoStep in types.ts. */
+      partialize: ({ db, restorePoints, lang, theme, activeVariantId }) => ({
+        db,
+        restorePoints,
+        lang,
+        theme,
+        activeVariantId,
+      }),
       /** v1 had no tag vocabulary and no restore points: recover the former from the data. */
       migrate: (persisted, from) => {
         const s = persisted as Partial<Store>;

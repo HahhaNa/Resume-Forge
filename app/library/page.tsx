@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useT } from "@/lib/i18n";
 import EntryModal from "@/components/resume/EntryModal";
-import { Dot, hue, hueOf, IconBtn, TagChips } from "@/components/ui/bits";
+import { AutoText, Dot, hue, hueOf, IconBtn, Ring, TagChips } from "@/components/ui/bits";
 import {
   KINDS,
   KIND_ABBR,
@@ -18,54 +18,105 @@ import type { Entry, EntryKind, Variant } from "@/lib/types";
 
 type Filter = "all" | "gaps" | "unused";
 
+/**
+ * Column widths are fixed rather than proportional. Left to itself a full-width table
+ * hands every spare pixel to the first column, which pushed the entry titles and their
+ * cells half a screen apart — in a matrix that gap is the whole readability problem,
+ * because the eye has nothing to follow across and loses the row. So the label column
+ * is sized to the longest org line it has to hold, the variant columns to a cell, and
+ * a trailing column with no width of its own soaks up whatever is left. Past about a
+ * dozen variants the sum outgrows the card and the table scrolls instead, which is
+ * what `table-fixed` does when the specified widths no longer fit.
+ */
+const COL_LABEL = 440;
+const COL_VARIANT = 112;
+const COL_ACTIONS = 92;
+
 /* ------------------------------------------------------------------ *
  * cells
  * ------------------------------------------------------------------ */
 
-/** One entry × one variant: how much of it that résumé renders, and the switch. */
-function EntryCell({
+/**
+ * The four things a cell can say, kept apart because two of them used to look alike.
+ *
+ * `bare` and `dark` are both "filed here with nothing ticked" — the difference is that
+ * education and awards stand on their own, so one of them prints and the other quietly
+ * does not. Reading that off `0/1` against `0/4` asked the user to remember which kinds
+ * need bullets; they get different shapes now.
+ */
+type CellState = "out" | "on" | "bare" | "dark";
+
+/**
+ * `resolve` drops an entry when none of its bullets is ticked, and an entry with no
+ * bullets at all fails that test too — so an empty experience is `dark`, not `bare`.
+ */
+function cellState(inVariant: boolean, used: number, kind: EntryKind): CellState {
+  if (!inVariant) return "out";
+  if (used > 0) return "on";
+  return needsBullets(kind) ? "dark" : "bare";
+}
+
+/**
+ * The glyph on its own, with no behaviour attached — the legend draws the same four,
+ * so what it explains cannot drift from what the grid shows.
+ */
+function CellGlyph({
   h,
-  inVariant,
+  state,
   used,
   total,
-  kind,
-  onClick,
-  title,
   label,
+  size = 30,
 }: {
   h: string;
-  inVariant: boolean;
+  state: CellState;
   used: number;
   total: number;
-  kind: EntryKind;
-  onClick: () => void;
-  title: string;
   /** skill groups have no bullets to count — they are simply in or out */
   label?: string;
+  size?: number;
 }) {
-  // in the section but with nothing ticked, `resolve` drops it — say so rather than lie
-  const dark = inVariant && total > 0 && used === 0 && needsBullets(kind);
+  if (state === "on")
+    return <Ring value={used} max={total} size={size} color={hue(h)} label={label} ink={hue(h, "ink")} />;
+
+  const ring = {
+    out: { border: "1px dashed var(--axis)", color: "var(--faint)" },
+    bare: { border: `1.5px solid ${hue(h, "line")}`, color: hue(h, "ink") },
+    dark: { border: "1.5px solid var(--warn)", color: "var(--warn)" },
+  }[state];
+
+  return (
+    <div
+      className="mono tabnum grid shrink-0 place-items-center rounded-full"
+      style={{
+        width: size,
+        height: size,
+        border: ring.border,
+        color: ring.color,
+        fontSize: state === "bare" ? 8.5 : 12,
+        fontWeight: state === "dark" ? 600 : 400,
+        lineHeight: 1,
+      }}
+    >
+      {state === "out" ? "+" : state === "dark" ? "!" : (label ?? `${used}/${total}`)}
+    </div>
+  );
+}
+
+/** One entry × one variant: how much of it that résumé renders, and the switch. */
+function EntryCell({
+  onClick,
+  title,
+  ...glyph
+}: Parameters<typeof CellGlyph>[0] & { onClick: () => void; title: string }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className="mono tabnum mx-auto grid h-[26px] w-[54px] place-items-center rounded-[8px] text-[10.5px] transition"
-      style={
-        inVariant
-          ? {
-              background: dark ? "transparent" : hue(h, "tint"),
-              border: `1px solid ${dark ? "var(--warn)" : hue(h, "line")}`,
-              color: dark ? "var(--warn)" : hue(h, "ink"),
-              fontWeight: 500,
-            }
-          : {
-              background: "transparent",
-              border: "1px dashed var(--axis)",
-              color: "var(--faint)",
-            }
-      }
+      aria-pressed={glyph.state !== "out"}
+      className="mx-auto block rounded-full transition"
     >
-      {inVariant ? (label ?? `${used}/${total}`) : "+"}
+      <CellGlyph {...glyph} />
     </button>
   );
 }
@@ -171,7 +222,10 @@ export default function LibraryPage() {
     setEditEntry(id);
   };
 
-  const colCount = 1 + nv + 1;
+  // the label column, every variant, the row actions, and the column that eats the slack
+  const colCount = 1 + nv + 2;
+  // the legend is a sample, so it needs a hue: the first variant's, to match what is below
+  const legendHue = nv ? hues[db.variants[0].id] : "t1";
 
   return (
     <div className="mx-auto flex max-w-[1700px] flex-col gap-3.5 p-3.5">
@@ -234,21 +288,45 @@ export default function LibraryPage() {
             ))}
           </div>
         </div>
+
+        {/* what a cell means, on the page rather than in a tooltip you have to find */}
+        <div
+          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-2.5 text-[11px]"
+          style={{ borderColor: "var(--grid)", color: "var(--muted)" }}
+        >
+          <span className="lbl mb-0">{t("legend")}</span>
+          {(
+            [
+              ["out", 0, 4, t("legendOut")],
+              ["on", 3, 4, t("legendOn")],
+              ["bare", 0, 1, t("legendBare")],
+              ["dark", 0, 4, t("legendDark")],
+            ] as [CellState, number, number, string][]
+          ).map(([state, used, total, text]) => (
+            <span key={state} className="inline-flex items-center gap-1.5">
+              <CellGlyph h={legendHue} state={state} used={used} total={total} size={24} />
+              {text}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* ---------- the matrix ---------- */}
       <div className="card overflow-x-auto p-0">
-        <table className="w-full border-separate border-spacing-0 text-left">
+        <table className="mx w-full table-fixed border-separate border-spacing-0 text-left">
+          <colgroup>
+            <col style={{ width: COL_LABEL }} />
+            {db.variants.map((v) => (
+              <col key={v.id} style={{ width: COL_VARIANT }} />
+            ))}
+            <col style={{ width: COL_ACTIONS }} />
+            <col />
+          </colgroup>
           <thead>
             <tr>
               <th
                 className="sticky left-0 z-20 px-[13px] py-2.5 text-[11px] font-medium"
-                style={{
-                  background: "var(--surface)",
-                  borderBottom: "1px solid var(--axis)",
-                  minWidth: 360,
-                  color: "var(--muted)",
-                }}
+                style={{ borderBottom: "1px solid var(--axis)", color: "var(--muted)" }}
               >
                 {t("entries")} / {t("bullets")}
               </th>
@@ -256,17 +334,18 @@ export default function LibraryPage() {
                 <th
                   key={v.id}
                   className="px-1.5 py-2.5 align-bottom"
-                  style={{ borderBottom: "1px solid var(--axis)", minWidth: 76 }}
+                  style={{ borderBottom: "1px solid var(--axis)" }}
                 >
                   <button
                     className="flex w-full flex-col items-center gap-1"
-                    title={t("editVariantHint")}
+                    /* the label truncates, so the tooltip has to carry it in full */
+                    title={`${v.label} — ${t("switchVariantHint")}`}
                     onClick={() => s.setActiveVariant(v.id)}
                   >
-                    <span className="flex items-center gap-1">
+                    <span className="flex max-w-full items-center gap-1">
                       <Dot color={hue(hues[v.id])} />
                       <span
-                        className="max-w-[86px] truncate text-[11.5px] font-semibold"
+                        className="truncate text-[11.5px] font-semibold"
                         style={{ color: s.activeVariantId === v.id ? "var(--ink)" : "var(--ink2)" }}
                       >
                         {v.label}
@@ -278,7 +357,8 @@ export default function LibraryPage() {
                   </button>
                 </th>
               ))}
-              <th style={{ borderBottom: "1px solid var(--axis)", width: 92 }} />
+              <th style={{ borderBottom: "1px solid var(--axis)" }} />
+              <th style={{ borderBottom: "1px solid var(--axis)" }} />
             </tr>
           </thead>
 
@@ -302,11 +382,7 @@ export default function LibraryPage() {
 
             {/* ---------- skills ---------- */}
             <tr>
-              <td
-                colSpan={colCount}
-                className="sticky left-0 px-[13px] pb-1.5 pt-4"
-                style={{ background: "var(--surface)" }}
-              >
+              <td colSpan={colCount} className="sticky left-0 px-[13px] pb-1.5 pt-4">
                 <span className="flex items-center gap-2.5">
                   <span className="text-[12.5px] font-semibold">{t("skills")}</span>
                   <span
@@ -322,21 +398,21 @@ export default function LibraryPage() {
               </td>
             </tr>
             {shownSkills.map((sk) => (
-              <tr key={sk.id} className="group">
+              <tr key={sk.id} className="group mx-row">
                 <td
                   className="sticky left-0 z-10 px-[13px] py-2"
-                  style={{ background: "var(--surface)", borderTop: "1px solid var(--grid)" }}
+                  style={{ borderTop: "1px solid var(--grid)" }}
                 >
                   <input
                     className="w-full bg-transparent text-[12.5px] font-semibold outline-none"
                     value={sk.label}
                     onChange={(e) => s.patchSkill(sk.id, { label: e.target.value })}
                   />
-                  <input
-                    className="w-full bg-transparent text-[11.5px] outline-none"
-                    style={{ color: "var(--muted)" }}
+                  <AutoText
                     value={sk.items}
-                    onChange={(e) => s.patchSkill(sk.id, { items: e.target.value })}
+                    size={11.5}
+                    tone="var(--muted)"
+                    onChange={(v) => s.patchSkill(sk.id, { items: v })}
                   />
                 </td>
                 {db.variants.map((v) => {
@@ -345,11 +421,10 @@ export default function LibraryPage() {
                     <td key={v.id} className="px-1.5 py-2" style={{ borderTop: "1px solid var(--grid)" }}>
                       <EntryCell
                         h={hues[v.id]}
-                        inVariant={on}
+                        state={on ? "on" : "out"}
                         used={1}
                         total={1}
                         label="✓"
-                        kind="education"
                         title={on ? t("clickRemove") : t("clickAdd")}
                         onClick={() => s.setSkillInVariant(v.id, sk.id, !on)}
                       />
@@ -357,7 +432,7 @@ export default function LibraryPage() {
                   );
                 })}
                 <td className="px-1.5 py-2" style={{ borderTop: "1px solid var(--grid)" }}>
-                  <div className="flex justify-end opacity-0 transition group-hover:opacity-100">
+                  <div className="flex opacity-0 transition group-hover:opacity-100">
                     <IconBtn title={t("addEverywhere")} onClick={() => s.setSkillEverywhere(sk.id, true)}>
                       ⊕
                     </IconBtn>
@@ -369,6 +444,7 @@ export default function LibraryPage() {
                     </IconBtn>
                   </div>
                 </td>
+                <td style={{ borderTop: "1px solid var(--grid)" }} />
               </tr>
             ))}
           </tbody>
@@ -378,7 +454,7 @@ export default function LibraryPage() {
             <tr>
               <td
                 className="sticky left-0 z-10 px-[13px] py-2.5"
-                style={{ background: "var(--surface)", borderTop: "1px solid var(--axis)" }}
+                style={{ borderTop: "1px solid var(--axis)" }}
               >
                 <span className="mono text-[10.5px]" style={{ color: "var(--faint)" }}>
                   {t("renders")}
@@ -401,6 +477,7 @@ export default function LibraryPage() {
                   </td>
                 );
               })}
+              <td style={{ borderTop: "1px solid var(--axis)" }} />
               <td style={{ borderTop: "1px solid var(--axis)" }} />
             </tr>
           </tfoot>
@@ -442,11 +519,7 @@ function GroupRows({
   return (
     <>
       <tr>
-        <td
-          colSpan={colCount}
-          className="sticky left-0 px-[13px] pb-1.5 pt-4"
-          style={{ background: "var(--surface)" }}
-        >
+        <td colSpan={colCount} className="sticky left-0 px-[13px] pb-1.5 pt-4">
           <span className="flex items-center gap-2.5">
             <span className="text-[12.5px] font-semibold">{KIND_SECTION[kind]}</span>
             <span
@@ -467,10 +540,10 @@ function GroupRows({
         const h = entryHue(e, db.tags);
         return (
           <Fragment key={e.id}>
-            <tr className="group">
+            <tr className="group mx-row">
               <td
                 className="sticky left-0 z-10 px-[13px] py-2"
-                style={{ background: "var(--surface)", borderTop: "1px solid var(--grid)" }}
+                style={{ borderTop: "1px solid var(--grid)" }}
               >
                 <div className="flex items-start gap-2.5">
                   <button
@@ -496,18 +569,18 @@ function GroupRows({
 
               {db.variants.map((v) => {
                 const u = entryUse(v, e);
+                const state = cellState(u.inVariant, u.used, e.kind);
                 return (
                   <td key={v.id} className="px-1.5 py-2" style={{ borderTop: "1px solid var(--grid)" }}>
                     <EntryCell
                       h={hues[v.id]}
-                      inVariant={u.inVariant}
+                      state={state}
                       used={u.used}
                       total={u.total}
-                      kind={e.kind}
                       title={
-                        !u.inVariant
+                        state === "out"
                           ? t("clickAdd")
-                          : u.used === 0 && u.total > 0 && needsBullets(e.kind)
+                          : state === "dark"
                             ? t("noBullets")
                             : t("clickRemove")
                       }
@@ -518,7 +591,7 @@ function GroupRows({
               })}
 
               <td className="px-1.5 py-2" style={{ borderTop: "1px solid var(--grid)" }}>
-                <div className="flex justify-end opacity-0 transition group-hover:opacity-100">
+                <div className="flex opacity-0 transition group-hover:opacity-100">
                   <IconBtn title={t("addEverywhere")} onClick={() => s.setEntryEverywhere(e.id, true)}>
                     ⊕
                   </IconBtn>
@@ -530,22 +603,23 @@ function GroupRows({
                   </IconBtn>
                 </div>
               </td>
+              <td style={{ borderTop: "1px solid var(--grid)" }} />
             </tr>
 
             {expanded &&
               e.bullets.map((b) => (
-                <tr key={b.id} className="group">
-                  <td
-                    className="sticky left-0 z-10 py-1 pl-[52px] pr-[13px]"
-                    style={{ background: "var(--sunken)" }}
-                  >
-                    <div className="flex items-start gap-2">
-                      <input
-                        className="min-w-0 flex-1 bg-transparent text-[11.5px] leading-[1.5] outline-none"
-                        style={{ color: "var(--ink2)" }}
-                        value={b.text}
-                        onChange={(ev) => s.patchBullet(e.id, b.id, { text: ev.target.value })}
-                      />
+                <tr key={b.id} className="group mx-row">
+                  {/* the bullet is what you are deciding about, so it wraps rather than
+                      running off the end of a single line — and its tags sit under it,
+                      not beside the variant switches they used to be mistaken for */}
+                  <td className="mx-sub sticky left-0 z-10 py-1.5 pl-[52px] pr-[13px]">
+                    <AutoText
+                      value={b.text}
+                      size={11.5}
+                      tone="var(--ink2)"
+                      onChange={(v) => s.patchBullet(e.id, b.id, { text: v })}
+                    />
+                    <div className="mt-1">
                       <TagChips
                         tags={b.tags}
                         all={db.tags}
@@ -564,7 +638,7 @@ function GroupRows({
                     const on = v.bulletIds.includes(b.id);
                     const ghost = !isInVariant(v, e.id);
                     return (
-                      <td key={v.id} className="px-1.5 py-1" style={{ background: "var(--sunken)" }}>
+                      <td key={v.id} className="mx-sub px-1.5 py-1">
                         <BulletCell
                           h={hues[v.id]}
                           on={on}
@@ -575,23 +649,20 @@ function GroupRows({
                       </td>
                     );
                   })}
-                  <td className="px-1.5 py-1" style={{ background: "var(--sunken)" }}>
-                    <div className="flex justify-end opacity-0 transition group-hover:opacity-100">
+                  <td className="mx-sub px-1.5 py-1">
+                    <div className="flex opacity-0 transition group-hover:opacity-100">
                       <IconBtn danger title={t("remove")} onClick={() => s.removeBullet(e.id, b.id)}>
                         ✕
                       </IconBtn>
                     </div>
                   </td>
+                  <td className="mx-sub" />
                 </tr>
               ))}
 
             {expanded && (
               <tr>
-                <td
-                  colSpan={colCount}
-                  className="sticky left-0 py-1.5 pl-[52px]"
-                  style={{ background: "var(--sunken)" }}
-                >
+                <td colSpan={colCount} className="mx-sub sticky left-0 py-1.5 pl-[52px]">
                   <button className="btn btn-sm" onClick={() => s.addBullet(e.id)}>
                     + {t("addBullet")}
                   </button>

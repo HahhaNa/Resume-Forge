@@ -9,7 +9,7 @@
  */
 
 import { uid } from "./id";
-import type { DB, Entry, EntryKind, Variant, VariantSection } from "./types";
+import type { Bullet, DB, Entry, EntryKind, SkillGroup, Variant, VariantSection } from "./types";
 
 export const KINDS: EntryKind[] = ["education", "experience", "project", "award", "activity"];
 
@@ -165,6 +165,83 @@ export function addSkillToVariant(db: DB, v: Variant, skillId: string): Variant 
   const made: VariantSection = { id: uid("s"), title, type: "skills", ids: [skillId] };
   const slot = sectionSlot(db, v, title);
   return { ...v, sections: [...v.sections.slice(0, slot), made, ...v.sections.slice(slot)] };
+}
+
+/* ---- comparing two variants --------------------------------------- */
+
+export interface VariantDiff {
+  /** Entries one variant files and the other does not. */
+  entries: { onlyA: Entry[]; onlyB: Entry[] };
+  /** For entries both carry: the bullets each one ticks that the other leaves off. */
+  bullets: { entry: Entry; onlyA: Bullet[]; onlyB: Bullet[] }[];
+  skills: { onlyA: SkillGroup[]; onlyB: SkillGroup[] };
+  /** Layout settings that differ, already stringified for display. */
+  settings: { key: string; a: string; b: string }[];
+  /** Ticked bullets the two have in common — the size of the shared spine. */
+  shared: number;
+}
+
+const SETTINGS: { key: string; of: (v: Variant) => string }[] = [
+  { key: "density", of: (v) => v.density },
+  { key: "font size", of: (v) => `${v.fontSize} pt` },
+  { key: "page target", of: (v) => String(v.pageTarget) },
+  { key: "links", of: (v) => v.linkStyle ?? "full" },
+  {
+    key: "header",
+    of: (v) =>
+      (["phone", "linkedin", "github", "site"] as const).filter((k) => v.header[k]).join(", ") || "email only",
+  },
+];
+
+/**
+ * What one variant says that the other does not.
+ *
+ * The interesting difference is almost never "these are two different documents" — the two
+ * share a spine and diverge in a handful of places, and those places are what you are trying
+ * to see. So entries present in only one side are reported whole, and bullets are compared
+ * only inside the entries *both* sides carry: listing every bullet of an entry the other
+ * variant never files would bury the three lines you actually swapped.
+ */
+export function diffVariants(db: DB, a: Variant, b: Variant): VariantDiff {
+  const onA = new Set(a.bulletIds);
+  const onB = new Set(b.bulletIds);
+
+  /**
+   * Filed is not the same as shown: `resolve` drops an entry whose every bullet is
+   * unticked, unless it is the kind that stands on its own. Comparing on "filed" would
+   * report a job one variant leaves out entirely as a four-bullet difference — so this
+   * asks the question the reader of the page would ask.
+   */
+  const shows = (v: Variant, on: Set<string>, e: Entry) =>
+    isInVariant(v, e.id) && (!needsBullets(e.kind) || e.bullets.some((x) => on.has(x.id)));
+  const inA = (e: Entry) => shows(a, onA, e);
+  const inB = (e: Entry) => shows(b, onB, e);
+
+  const entries = {
+    onlyA: db.entries.filter((e) => inA(e) && !inB(e)),
+    onlyB: db.entries.filter((e) => !inA(e) && inB(e)),
+  };
+
+  let shared = 0;
+  const bullets: VariantDiff["bullets"] = [];
+  for (const e of db.entries) {
+    if (!inA(e) || !inB(e)) continue;
+    const onlyA = e.bullets.filter((x) => onA.has(x.id) && !onB.has(x.id));
+    const onlyB = e.bullets.filter((x) => !onA.has(x.id) && onB.has(x.id));
+    shared += e.bullets.filter((x) => onA.has(x.id) && onB.has(x.id)).length;
+    if (onlyA.length || onlyB.length) bullets.push({ entry: e, onlyA, onlyB });
+  }
+
+  const skills = {
+    onlyA: db.skills.filter((k) => isInVariant(a, k.id) && !isInVariant(b, k.id)),
+    onlyB: db.skills.filter((k) => !isInVariant(a, k.id) && isInVariant(b, k.id)),
+  };
+
+  const settings = SETTINGS.map((s) => ({ key: s.key, a: s.of(a), b: s.of(b) })).filter(
+    (x) => x.a !== x.b
+  );
+
+  return { entries, bullets, skills, settings, shared };
 }
 
 /** How much of an entry a variant actually renders. */

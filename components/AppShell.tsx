@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { useBackup } from "@/lib/backup";
 import { useT } from "@/lib/i18n";
+import UndoToast, { UndoButton } from "@/components/ui/Undo";
 
 /**
  * What the header says about where your data is. The states that need doing
@@ -85,6 +86,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           >
             {hydrated ? (SAVED_AS[status] ?? SAVED_AS.off).text : "loading…"}
           </Link>
+          <UndoButton />
           {/* language lives on the Data page — it is a set-once choice, not a toggle */}
           <button
             className="grid h-[30px] w-[30px] place-items-center rounded-[9px] text-[13px] transition"
@@ -97,6 +99,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main>{children}</main>
+      <UndoToast />
     </div>
   );
 }

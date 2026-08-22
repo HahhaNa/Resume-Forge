@@ -146,15 +146,64 @@ export function tex(s: string): string {
     .replace(/→/g, "$\\rightarrow$");
 }
 
+/**
+ * A line split into its bold and plain runs — the one place `**` is interpreted, so the
+ * preview and the .tex can never disagree about where a bold starts.
+ *
+ * A *run* of two or more asterisks is the delimiter, and a lone `*` is just an asterisk.
+ * That is what lets "A* search" or "n * log n" sit inside a bold without ending it early,
+ * and it is why `***x***` bolds `x` rather than leaving a stray asterisk on each side.
+ *
+ * Which runs count is CommonMark's flanking rule, trimmed to what one line of a bullet
+ * needs: a delimiter may open only when a non-space follows it and close only when a
+ * non-space precedes it. So "3 ** 4" stays arithmetic, and a `**` that never finds its
+ * partner prints as the two asterisks that were typed instead of bolding the rest of the
+ * line while the author is still mid-word.
+ */
+export function boldRuns(s: string): { text: string; bold: boolean }[] {
+  const out: { text: string; bold: boolean }[] = [];
+  let plain = "";
+  /** set once a delimiter has opened: the asterisks it was written with, and what follows */
+  let open: { marker: string; text: string } | null = null;
+
+  for (let i = 0; i < s.length; ) {
+    if (s[i] !== "*") {
+      if (open) open.text += s[i];
+      else plain += s[i];
+      i++;
+      continue;
+    }
+    let j = i;
+    while (s[j] === "*") j++;
+    const run = s.slice(i, j);
+    const delim = run.length >= 2;
+    const canOpen = delim && j < s.length && !/\s/.test(s[j]);
+    const canClose = delim && i > 0 && !/\s/.test(s[i - 1]);
+
+    // a run that could do either closes what is open — an author who typed an opener
+    // meant it to end somewhere
+    if (open && canClose) {
+      out.push({ text: plain, bold: false }, { text: open.text, bold: true });
+      plain = "";
+      open = null;
+    } else if (!open && canOpen) {
+      open = { marker: run, text: "" };
+    } else if (open) {
+      open.text += run;
+    } else {
+      plain += run;
+    }
+    i = j;
+  }
+  if (open) plain += open.marker + open.text;
+  if (plain) out.push({ text: plain, bold: false });
+  return out.filter((p) => p.text.length > 0);
+}
+
 /** `**bold**` -> \textbf{...}; everything else escaped. */
 export function richTex(s: string): string {
-  return s
-    .split(/(\*\*[^*]+\*\*)/g)
-    .map((part) =>
-      part.startsWith("**") && part.endsWith("**") && part.length > 4
-        ? `\\textbf{${tex(part.slice(2, -2))}}`
-        : tex(part)
-    )
+  return boldRuns(s)
+    .map((p) => (p.bold ? `\\textbf{${tex(p.text)}}` : tex(p.text)))
     .join("");
 }
 
@@ -218,16 +267,7 @@ export function protectParts(s: string) {
 }
 
 export function richHtmlParts(s: string) {
-  return s
-    .split(/(\*\*[^*]+\*\*)/g)
-    .map((part, i) => ({
-      key: i,
-      bold: part.startsWith("**") && part.endsWith("**") && part.length > 4,
-      text: display(
-        part.startsWith("**") && part.endsWith("**") && part.length > 4 ? part.slice(2, -2) : part
-      ),
-    }))
-    .filter((p) => p.text.length > 0);
+  return boldRuns(s).map((p, i) => ({ key: i, bold: p.bold, text: display(p.text) }));
 }
 
 /**
@@ -398,6 +438,52 @@ ${sizePkg}\\usepackage{charter}
     .join("");
 
   return `${head}${body}\n\\end{document}\n`;
+}
+
+/**
+ * The same résumé as text you can paste into a box.
+ *
+ * Half of the portals that take a PDF also have a "or paste your résumé here" field, and
+ * what comes out of copying the preview is two columns interleaved into nonsense. This is
+ * the one output that is not trying to look like anything: no columns, no tabs, no glyphs
+ * a parser has to guess at. Section titles go up in capitals because that is the only
+ * emphasis plain text has, dates follow their heading behind an en dash rather than sitting
+ * off to the right, and bullets are hyphens — `•` survives most parsers but not all, and
+ * there is nothing to gain by finding out which one you are pasting into.
+ *
+ * `**bold**` is dropped rather than turned into asterisks: a screening parser reads them as
+ * part of the word.
+ */
+export function buildPlainText(db: DB, variant: Variant): string {
+  const r = resolve(db, variant);
+  const flat = (s: string) =>
+    display(
+      boldRuns(s)
+        .map((p) => p.text)
+        .join("")
+    );
+  /** `Org — Location`, skipping either half when it is blank. */
+  const join = (parts: (string | undefined)[]) => parts.map((x) => x?.trim()).filter(Boolean).join(" — ");
+
+  const out: string[] = [flat(r.name).toUpperCase()];
+  if (r.contact.length) out.push(r.contact.map((c) => flat(c.text)).join(" · "));
+
+  for (const sec of r.sections) {
+    out.push("", flat(sec.title).toUpperCase(), "");
+    if (sec.type === "skills") {
+      for (const s of sec.skills) out.push(`${flat(s.label)}: ${flat(s.items)}`);
+      continue;
+    }
+    sec.blocks.forEach((b, i) => {
+      if (i > 0) out.push("");
+      out.push(join([flat(b.org), flat(b.location)]));
+      const second = join([flat(b.title), flat(b.period)]);
+      if (second) out.push(second);
+      for (const x of b.bullets) out.push(`- ${flat(x.text)}`);
+    });
+  }
+
+  return `${out.join("\n")}\n`;
 }
 
 /** `JaneDoe_Resume_hw_20260730` — name, kind, variant slug, local date. */

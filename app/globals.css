@@ -324,6 +324,24 @@ body {
   .ck {
     accent-color: var(--accent);
   }
+
+  /* The library matrix. Cell backgrounds live here rather than inline because the row
+     highlight has to override them, and the first column is frozen: unless every cell
+     in the row repaints together the highlight tears at the freeze line. Only .mx-row
+     lights up — the group headings are labels, not rows you can act on. */
+  .mx th,
+  .mx td {
+    background: var(--surface);
+  }
+  .mx .mx-sub {
+    background: var(--sunken);
+  }
+  .mx .mx-row:hover > td {
+    background: var(--plane);
+  }
+  .mx .mx-row:hover > .mx-sub {
+    background: var(--chip);
+  }
 }
 
 /* A textarea that grows with its text. A hidden replica of the value shares the grid

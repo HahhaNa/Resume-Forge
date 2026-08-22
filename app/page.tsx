@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useT } from "@/lib/i18n";
-import { baseName, buildTex, fileName, resolve } from "@/lib/resume";
+import { baseName, buildPlainText, buildTex, fileName, resolve } from "@/lib/resume";
 import Preview from "@/components/resume/Preview";
 import EntryModal from "@/components/resume/EntryModal";
+import CompareVariants from "@/components/resume/CompareVariants";
 import ImportResume from "@/components/ImportResume";
 import {
+  AutoText,
   Check,
   Dot,
   Field,
@@ -25,35 +27,6 @@ import { CONTACT_FIELDS } from "@/lib/types";
 import type { Variant } from "@/lib/types";
 import { KIND_ABBR, defaultBulletIds, entryHue } from "@/lib/library";
 
-/** A textarea that reads as plain text and grows with its content (see `.grow` in globals.css). */
-function AutoText({
-  value,
-  onChange,
-  muted,
-  className = "",
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  muted?: boolean;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`grow w-full text-[12px] leading-[1.45] ${className}`}
-      data-value={value}
-      style={{ color: muted ? "var(--muted)" : "var(--ink)" }}
-    >
-      <textarea
-        rows={1}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent outline-none"
-        style={{ color: "inherit" }}
-      />
-    </div>
-  );
-}
-
 export default function ResumePage() {
   const s = useStore();
   const t = useT();
@@ -66,7 +39,9 @@ export default function ResumePage() {
   const [addTo, setAddTo] = useState<string | null>(null);
   const [tagFor, setTagFor] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [copied, fireCopied] = useCopied();
+  const [copiedText, fireCopiedText] = useCopied();
 
   const tex = useMemo(() => (variant ? buildTex(db, variant) : ""), [db, variant]);
   const r = useMemo(() => (variant ? resolve(db, variant) : null), [db, variant]);
@@ -144,6 +119,11 @@ export default function ResumePage() {
             <button className="btn btn-sm btn-mono" onClick={() => setImportOpen(true)}>
               ↑ {t("importResume")}
             </button>
+            {db.variants.length > 1 && (
+              <button className="btn btn-sm btn-mono" onClick={() => setCompareOpen(true)}>
+                ⇄ {t("compare")}
+              </button>
+            )}
             <button className="btn btn-sm btn-mono" onClick={() => setSettings(true)}>
               ⚙ {t("edit")}
             </button>
@@ -387,7 +367,11 @@ export default function ResumePage() {
                           <span className="mono shrink-0 text-[10.5px] leading-[1.6]" style={{ color: "var(--faint)" }}>
                             {e.period}
                           </span>
-                          <Ring value={onCount} max={e.bullets.length} />
+                          <Ring
+                            value={onCount}
+                            max={e.bullets.length}
+                            title={`${onCount} / ${e.bullets.length}`}
+                          />
                           <div className="flex shrink-0 opacity-0 transition group-hover:opacity-100">
                             <IconBtn title={t("edit")} onClick={() => setEditEntry(e.id)}>
                               ✎
@@ -538,6 +522,16 @@ export default function ResumePage() {
             >
               {copied ? `✓ ${t("copied")}` : t("copyTex")}
             </button>
+            <button
+              className="btn"
+              title={t("copyTextHint")}
+              onClick={() => {
+                navigator.clipboard.writeText(buildPlainText(db, variant));
+                fireCopiedText();
+              }}
+            >
+              {copiedText ? `✓ ${t("copied")}` : t("copyText")}
+            </button>
             <button className="btn" onClick={download}>
               ↓ .tex
             </button>
@@ -586,6 +580,8 @@ export default function ResumePage() {
       </div>
 
       {/* ------------- modals ------------- */}
+      <CompareVariants open={compareOpen} onClose={() => setCompareOpen(false)} variant={variant} />
+
       <Modal open={settings} onClose={() => setSettings(false)} title={t("variant")}>
         <div className="space-y-3">
           <Field label={t("label")} value={variant.label} onChange={(v) => s.patchVariant(variant.id, { label: v })} />

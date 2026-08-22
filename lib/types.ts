@@ -189,6 +189,38 @@ export interface RestorePoint {
 }
 
 /** Oldest points fall off the end. Each is roughly the size of the database. */
-export const MAX_RESTORE_POINTS = 8;
+export const MAX_RESTORE_POINTS = 12;
+
+/**
+ * One step of the undo history: the database as it stood *before* an action, so
+ * undoing is just putting it back.
+ *
+ * `db` is the previous object, not a copy. Every action in the store rebuilds the
+ * objects it touches and leaves the rest alone, so an old database still points at
+ * the parts that never changed and a step costs only what the action actually
+ * rewrote. That is what makes a stack this deep affordable — and it is why nothing
+ * in the store may ever mutate a database in place.
+ *
+ * The stack is deliberately not persisted: a step is cheap in memory but not in
+ * localStorage, where it would be serialised in full on every keystroke. Undo is
+ * for the mistake you notice now; the restore points on the Data tab are for the
+ * one you notice tomorrow.
+ */
+export interface UndoStep {
+  id: string;
+  /** What the action did, e.g. `Bullet deleted` — read back as "Undone — …". */
+  label: string;
+  at: number;
+  /** Actions sharing a key, back to back and close in time, collapse into one step. */
+  coalesce?: string;
+  db: DB;
+  activeVariantId: string;
+}
+
+/** Undo depth. Structural sharing means this costs far less than 60 databases. */
+export const MAX_UNDO = 60;
+
+/** How long a run of edits to the same field stays one undo step. */
+export const UNDO_COALESCE_MS = 1000;
 
 export const REVIEW_INTERVALS: Record<number, number> = { 1: 1, 2: 3, 3: 7, 4: 16, 5: 35 };

@@ -260,11 +260,19 @@ export function Ring({
   max,
   size = 30,
   color = "var(--accent)",
+  label,
+  title,
+  ink,
 }: {
   value: number;
   max: number;
   size?: number;
   color?: string;
+  /** replaces the `value/max` in the middle, for something that is simply in or out */
+  label?: React.ReactNode;
+  /** left off when the ring sits inside a control that carries its own tooltip */
+  title?: string;
+  ink?: string;
 }) {
   const turn = max > 0 ? value / max : 0;
   const inner = size - 7;
@@ -276,7 +284,7 @@ export function Ring({
         height: size,
         background: `conic-gradient(${color} 0turn ${turn}turn, var(--track) ${turn}turn 1turn)`,
       }}
-      title={`${value} / ${max}`}
+      title={title}
     >
       <div
         className="mono tabnum grid place-items-center rounded-full text-[8.5px]"
@@ -284,11 +292,52 @@ export function Ring({
           width: inner,
           height: inner,
           background: "var(--surface)",
-          color: value > 0 ? "var(--ink2)" : "var(--muted)",
+          color: ink ?? (value > 0 ? "var(--ink2)" : "var(--muted)"),
         }}
       >
-        {value}/{max}
+        {label ?? `${value}/${max}`}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A textarea that reads as plain text and grows with its content (see `.grow` in
+ * globals.css). Size and colour go in via style rather than a class, so a caller can
+ * override them without two arbitrary Tailwind values racing each other.
+ */
+export function AutoText({
+  value,
+  onChange,
+  muted,
+  tone,
+  size = 12,
+  className = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  muted?: boolean;
+  tone?: string;
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`grow w-full ${className}`}
+      data-value={value}
+      style={{
+        color: tone ?? (muted ? "var(--muted)" : "var(--ink)"),
+        fontSize: size,
+        lineHeight: 1.45,
+      }}
+    >
+      <textarea
+        rows={1}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-transparent outline-none"
+        style={{ color: "inherit" }}
+      />
     </div>
   );
 }

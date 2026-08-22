@@ -41,6 +41,15 @@ const dict = {
     notInVariant: "Not used here",
 
     copyTex: "Copy .tex",
+    copyText: "Copy text",
+    copyTextHint:
+      "Plain text for the “or paste your résumé here” box on an application form — no columns, no bold, nothing for a parser to trip on.",
+    compare: "Compare",
+    compareWith: "Compare with",
+    onlyIn: "Only in",
+    sharedBullets: "bullets in both",
+    sameContent: "These two render exactly the same content.",
+    layoutDiffers: "Layout",
     downloadTex: "Download .tex",
     openOverleaf: "Open in Overleaf",
     printPdf: "Print / Save PDF",
@@ -130,6 +139,13 @@ const dict = {
     collapse: "Hide bullets",
     renders: "renders",
     editVariantHint: "Click a variant to switch to it, double-click to edit its details",
+    /* the matrix header has no double-click, so it must not promise one */
+    switchVariantHint: "Click to switch to this variant",
+    legend: "Cell",
+    legendOut: "not in this variant",
+    legendOn: "in — the ring is how much of it is switched on",
+    legendBare: "in, nothing ticked — still appears",
+    legendDark: "nothing ticked — will not appear",
     language: "Language",
 
     importResume: "Import an existing résumé",
@@ -142,9 +158,13 @@ const dict = {
     importFailed: "Import failed",
     importAnother: "Another file",
     importAppend: "Add to my library",
-    importReplace: "Replace my résumé",
+    importVariant: "Replace /{n}",
+    importVariantHint:
+      "Keeps your library and every other variant. Only /{n} changes: it stops showing what it shows now and shows this import instead, with its own slug, density and page target untouched.",
+    importReplace: "Replace everything",
     importReplaceConfirm:
-      "Replace the current entries, skills and variants with this import? Applications and practice logs are kept.",
+      "Replace the current entries, skills and variants with this import? Applications and practice logs are kept. To retarget only the variant you are on, cancel and use “Replace /…” instead.",
+    importedVariant: "/{n} now shows the imported résumé.",
     warnNoName: "Could not find a name in the header — fill it in on this page.",
     warnNoSections: "No \\section{...} blocks were found, so there is nothing to import.",
     warnNoLayout: "No sections were recognised — the layout may be unusual.",
@@ -185,12 +205,13 @@ const dict = {
     newTag: "Add tag",
     renameTag: "Rename",
     removeTagConfirm:
-      "Delete this tag? It is stripped from every bullet, entry and skill group that carries it. A restore point is not kept for this.",
+      "Delete this tag? It is stripped from every bullet, entry and skill group that carries it. A restore point is kept, and Undo reverses it too.",
 
     restorePoints: "Restore points",
     restorePointsNote:
-      "A copy of the whole database is kept before each import and reset, so a bad import is one click away from being undone. Newest first; the oldest fall off.",
-    noRestorePoints: "Nothing to restore yet — one is taken the next time you import or reset.",
+      "A copy of the whole database is kept before each import and reset, and before a deletion that takes a lot with it — an entry with its bullets, a variant, a platform with its problems, a tag. Undo (⌘Z) covers everything else, but only until you close the tab; these outlive it. Newest first, oldest fall off.",
+    noRestorePoints:
+      "Nothing to restore yet — one is taken the next time you import, reset, or delete something large.",
     restore: "Restore",
     restoreConfirm: "Restore this copy? What is on screen now becomes a restore point of its own.",
     restored: "Restored.",
@@ -199,6 +220,12 @@ const dict = {
     importedAppended: "Added the imported resume alongside what you had.",
     importUndoNote:
       "A restore point was taken first. Undo it here, or later from the Data tab.",
+    undo: "Undo",
+    redo: "Redo",
+    undone: "Undone",
+    nothingToUndo: "Nothing to undo",
+    dismiss: "Dismiss",
+
     profile: "Profile",
     name: "Name",
     email: "Email",
@@ -255,6 +282,15 @@ const dict = {
     notInVariant: "此版本未使用",
 
     copyTex: "複製 .tex",
+    copyText: "複製純文字",
+    copyTextHint:
+      "給申請表單上「或者把履歷貼在這裡」那個框用的 — 沒有分欄、沒有粗體，不會讓履歷解析器讀錯。",
+    compare: "比較",
+    compareWith: "比較對象",
+    onlyIn: "只在",
+    sharedBullets: "兩邊都有",
+    sameContent: "這兩個版本輸出的內容完全一樣。",
+    layoutDiffers: "版面設定",
     downloadTex: "下載 .tex",
     openOverleaf: "用 Overleaf 開啟",
     printPdf: "列印／存成 PDF",
@@ -344,6 +380,12 @@ const dict = {
     collapse: "收起條目",
     renders: "實際輸出",
     editVariantHint: "點一下切換版本，按兩下直接改它的細節",
+    switchVariantHint: "點一下切換到這個版本",
+    legend: "格子",
+    legendOut: "這個版本沒有",
+    legendBare: "有，但一條都沒勾 — 還是會出現",
+    legendOn: "有 — 圓環是開了多少",
+    legendDark: "一條都沒勾 — 不會出現",
     language: "語言",
 
     importResume: "匯入舊履歷",
@@ -356,8 +398,13 @@ const dict = {
     importFailed: "匯入失敗",
     importAnother: "換一個檔案",
     importAppend: "加進現有條目庫",
-    importReplace: "取代目前履歷",
-    importReplaceConfirm: "用這次匯入的內容取代現有的經歷、技能與版本？投遞與刷題紀錄會保留。",
+    importVariant: "取代 /{n}",
+    importVariantHint:
+      "條目庫和其他版本都不動，只有 /{n} 換掉：它不再顯示現在的內容，改成顯示這份匯入的履歷；它自己的代號、行距和頁數目標都會保留。",
+    importReplace: "全部取代",
+    importReplaceConfirm:
+      "用這次匯入的內容取代現有的經歷、技能與版本？投遞與刷題紀錄會保留。如果只是想換掉目前這個版本的內容，請取消，改按「取代 /…」。",
+    importedVariant: "/{n} 現在顯示的是匯入的這份履歷。",
     warnNoName: "抓不到姓名，請在這頁補上。",
     warnNoSections: "找不到 \\section{...}，沒有東西可以匯入。",
     warnNoLayout: "認不出任何區塊，這份排版可能比較特別。",
@@ -395,12 +442,13 @@ const dict = {
       "標籤由你自己定義，通常一個投遞方向一個。版本名稱和標籤同名時會共用顏色；帶該標籤的 bullet 在對應版本裡預設會被勾選。",
     newTag: "新增標籤",
     renameTag: "重新命名",
-    removeTagConfirm: "刪除這個標籤？所有 bullet、經歷和技能上的這個標籤都會被移除，而且不會留還原點。",
+    removeTagConfirm:
+      "刪除這個標籤？所有 bullet、經歷和技能上的這個標籤都會被移除。系統會先留一個還原點，也可以直接用「復原」退回。",
 
     restorePoints: "還原點",
     restorePointsNote:
-      "每次匯入和重設前都會先備份整個資料庫，匯錯了按一下就能救回來。由新到舊排列，太舊的會自動移除。",
-    noRestorePoints: "目前沒有還原點；下次匯入或重設時會自動建立。",
+      "每次匯入、重設，以及會一次刪掉很多東西的操作前（連同 bullet 的一筆經歷、一個版本、連同題目的一個平台、一個標籤），都會先備份整個資料庫。其他操作用「復原」（⌘Z）就能退回，但關掉分頁就沒了；還原點則會留著。由新到舊排列，太舊的會自動移除。",
+    noRestorePoints: "目前沒有還原點；下次匯入、重設或刪掉比較大的東西時會自動建立。",
     restore: "還原",
     restoreConfirm: "還原成這份備份？目前畫面上的資料會另外存成一個還原點。",
     restored: "已還原。",
@@ -408,6 +456,12 @@ const dict = {
     importedReplaced: "已用匯入的履歷取代原本的資料。",
     importedAppended: "已把匯入的履歷加在原本的資料旁邊。",
     importUndoNote: "匯入前已自動建立還原點。可以在這裡直接復原，或之後到 Data 分頁還原。",
+    undo: "復原",
+    redo: "重做",
+    undone: "已復原",
+    nothingToUndo: "沒有可以復原的操作",
+    dismiss: "關閉",
+
     profile: "個人資料",
     name: "姓名",
     email: "Email",

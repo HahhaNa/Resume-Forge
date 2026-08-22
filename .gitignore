@@ -27,3 +27,4 @@ next-env.d.ts
 my-resume-data.json
 *.pdf
 *.tex
+.vercel

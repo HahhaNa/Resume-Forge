@@ -4,7 +4,7 @@
 
 **Write each bullet point once. Build a different résumé for every kind of job you apply to. Keep track of where you sent them.**
 
-[**▸ Open Resume Forge**](https://resume-forge.vercel.app) · [User guide](docs/guide.md) · [How it's built](docs/architecture.md)
+[**▸ Open Resume Forge**](https://resume-forge-blond.vercel.app) · [User guide](docs/guide.md) · [How it's built](docs/architecture.md)
 
 Free · open source · no sign-up · nothing is uploaded anywhere
 
@@ -59,7 +59,7 @@ holding your job hunt. Export the whole thing as one file whenever you like.
 
 ## Five minutes to your first résumé
 
-1. **[Open the app](https://resume-forge.vercel.app).** You'll land on a made-up candidate's data —
+1. **[Open the app](https://resume-forge-blond.vercel.app).** You'll land on a made-up candidate's data —
    that's just so the screens aren't blank. Nothing is saved anywhere but your own browser.
 
 2. **Go to the Data tab and set up a backup file first.** Press `Choose a backup file` and save it
@@ -183,7 +183,7 @@ everything else keeps working without it.
 
 ## Run it on your own computer
 
-You don't need to — [the hosted version](https://resume-forge.vercel.app) is the same app and your
+You don't need to — [the hosted version](https://resume-forge-blond.vercel.app) is the same app and your
 data still stays on your machine. This is for people who want to change the code.
 
 You'll need [Node.js](https://nodejs.org) 20 or newer.

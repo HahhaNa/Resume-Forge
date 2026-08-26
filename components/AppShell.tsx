@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { daysSince, useBackup } from "@/lib/backup";
 import { useT } from "@/lib/i18n";
 import UndoToast, { UndoButton } from "@/components/ui/Undo";
+import BackupInvite from "@/components/BackupInvite";
 
 /**
  * What the header says about where your data is. The states that need doing
@@ -126,6 +127,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </header>
       <main>{children}</main>
       <UndoToast />
+      <BackupInvite />
     </div>
   );
 }

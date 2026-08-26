@@ -201,6 +201,13 @@ const dict = {
     backupLastSaved: "Last written",
     backupNever: "never",
     backupStale: "Last export was {n} days ago.",
+    inviteTitle: "Keep a second copy",
+    inviteBody:
+      "Right now this browser is the only thing holding your work, and clearing site data would take it with it. Point this at a file inside iCloud Drive or Dropbox and every edit is written there a second later — which is also how the same résumé reaches your other machine.",
+    inviteBodyUnsupported:
+      "Right now this browser is the only thing holding your work. Safari and Firefox cannot keep a file open for writing, so the second copy has to be one you make: export it now, and again whenever you have done real work. Chrome and Edge can keep the file current on their own.",
+    inviteLater: "Not now",
+    inviteFootnote: "The Data tab has this too, whenever you want it.",
 
     tagVocab: "Tags",
     tagVocabNote:
@@ -455,6 +462,13 @@ const dict = {
     backupLastSaved: "上次寫入",
     backupNever: "從未",
     backupStale: "距離上次匯出已經 {n} 天。",
+    inviteTitle: "留一份備份在別的地方",
+    inviteBody:
+      "現在只有這個瀏覽器存著你的資料，清除瀏覽資料就會跟著一起消失。選一個放在 iCloud Drive 或 Dropbox 裡的檔案，之後每次修改都會在一秒後寫進去 —— 換一台電腦打開的也是同一份履歷。",
+    inviteBodyUnsupported:
+      "現在只有這個瀏覽器存著你的資料。Safari 和 Firefox 沒辦法讓網頁一直寫同一個檔案，所以第二份拷貝得自己來：現在先匯出一份，之後每次真的動了東西再匯出一次。Chrome 和 Edge 可以自動幫你維持這個檔案。",
+    inviteLater: "現在不要",
+    inviteFootnote: "「資料」頁隨時可以再設定一次。",
 
     tagVocab: "標籤",
     tagVocabNote:

@@ -95,8 +95,19 @@ const dropHandle = () => tx("readwrite", (s) => s.delete(IDB_KEY));
  */
 export type BackupStatus = "unsupported" | "off" | "on" | "locked" | "conflict" | "error";
 
+/**
+ * How far the first-run invitation has got. "" — never answered. "empty" —
+ * waved away while there was nothing yet to lose, which answers "not now"
+ * rather than "no", so it comes back once there is. "done" — answered, by
+ * connecting a file or by declining with real work on the line.
+ */
+export type Invite = "" | "empty" | "done";
+
 interface Backup {
   status: BackupStatus;
+  /** Not persisted — false until `init` has settled and `status` means something. */
+  ready: boolean;
+  invite: Invite;
   fileName: string;
   lastSavedAt: string;
   lastExportAt: string;
@@ -112,6 +123,7 @@ interface Backup {
   takeIncoming: () => void;
   keepLocal: () => Promise<void>;
   markExported: () => void;
+  dismissInvite: () => void;
   /** Write the file now instead of a second from now. See the Save button. */
   saveNow: () => Promise<void>;
 }
@@ -124,6 +136,8 @@ export const useBackup = create<Backup>()(
   persist(
     (set, get) => ({
       status: "off",
+      ready: false,
+      invite: "",
       fileName: "",
       lastSavedAt: "",
       lastExportAt: "",
@@ -131,28 +145,33 @@ export const useBackup = create<Backup>()(
       incoming: null,
 
       init: async () => {
-        if (!backupSupported()) {
-          set({ status: "unsupported" });
-          return;
-        }
-        let h: FileHandle | undefined;
         try {
-          h = await readHandle();
-        } catch {
-          /* private windows can refuse IndexedDB outright */
-        }
-        if (!h) {
-          set({ status: "off", fileName: "" });
-          return;
-        }
-        handle = h;
-        set({ fileName: h.name });
+          if (!backupSupported()) {
+            set({ status: "unsupported" });
+            return;
+          }
+          let h: FileHandle | undefined;
+          try {
+            h = await readHandle();
+          } catch {
+            /* private windows can refuse IndexedDB outright */
+          }
+          if (!h) {
+            set({ status: "off", fileName: "" });
+            return;
+          }
+          handle = h;
+          set({ fileName: h.name });
 
-        if ((await h.queryPermission({ mode: "readwrite" })) !== "granted") {
-          set({ status: "locked" });
-          return;
+          if ((await h.queryPermission({ mode: "readwrite" })) !== "granted") {
+            set({ status: "locked" });
+            return;
+          }
+          await reconcile();
+        } finally {
+          // whatever happened, the invitation now knows whether to appear
+          set({ ready: true });
         }
-        await reconcile();
       },
 
       connectNew: async () => {
@@ -162,7 +181,7 @@ export const useBackup = create<Backup>()(
           const h = await pick(PICK_OPTS);
           handle = h;
           await writeHandle(h);
-          set({ fileName: h.name, status: "on", error: "", incoming: null });
+          set({ fileName: h.name, status: "on", error: "", incoming: null, invite: "done" });
           await flush();
           watch();
         } catch (e) {
@@ -178,7 +197,7 @@ export const useBackup = create<Backup>()(
           if (!h) return;
           handle = h;
           await writeHandle(h);
-          set({ fileName: h.name, error: "" });
+          set({ fileName: h.name, error: "", invite: "done" });
           await reconcile();
         } catch (e) {
           if (!aborted(e)) set({ status: "error", error: message(e) });
@@ -228,6 +247,8 @@ export const useBackup = create<Backup>()(
 
       markExported: () => set({ lastExportAt: stamp() }),
 
+      dismissInvite: () => set({ invite: useStore.getState().ownWorkAt ? "done" : "empty" }),
+
       /**
        * Everything is already saved — that is the point of the debounce and of
        * `persist`. What this is for is the person who cannot see that, and who
@@ -247,6 +268,7 @@ export const useBackup = create<Backup>()(
         fileName: s.fileName,
         lastSavedAt: s.lastSavedAt,
         lastExportAt: s.lastExportAt,
+        invite: s.invite,
       }),
     }
   )
@@ -352,6 +374,31 @@ function unwatch() {
   timer = null;
   stop?.();
   stop = null;
+}
+
+/**
+ * Whether the first-run invitation still has something to ask. Kept out of the
+ * component because the rule is about what the user has already answered, not
+ * about what the backup system is currently doing.
+ */
+export function invitePending(status: BackupStatus, invite: Invite, hasWork: boolean): boolean {
+  if (status !== "off" && status !== "unsupported") return false;
+  return invite === "" || (invite === "empty" && hasWork);
+}
+
+/**
+ * The manual copy: one file, one click, no permission to grant and nothing to
+ * keep connected. It is what Safari and Firefox have instead of a live handle,
+ * and what every browser falls back to when the picker is refused.
+ */
+export function exportFile() {
+  const blob = new Blob([serialise(useStore.getState().db)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `resume-forge-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  useBackup.getState().markExported();
 }
 
 /** Days since an ISO stamp, or null if it never happened. */

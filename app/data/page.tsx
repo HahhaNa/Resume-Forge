@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
-import { daysSince, useBackup } from "@/lib/backup";
+import { daysSince, exportFile, useBackup } from "@/lib/backup";
 import { useT } from "@/lib/i18n";
 import { Dot, Field, hue, hueOf, IconBtn } from "@/components/ui/bits";
 import ImportResume from "@/components/ImportResume";
@@ -17,16 +17,6 @@ export default function DataPage() {
 
   if (!s.hydrated) return <div className="p-8 text-sm" style={{ color: "var(--muted)" }}>Loading…</div>;
   const p = s.db.profile;
-
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(s.db, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `resume-forge-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    useBackup.getState().markExported();
-  };
 
   const importJson = (f: File) => {
     const rd = new FileReader();
@@ -105,7 +95,7 @@ export default function DataPage() {
           {t("dataNote")}
         </p>
         <div className="flex flex-wrap gap-2">
-          <button className="btn btn-primary" onClick={exportJson}>
+          <button className="btn btn-primary" onClick={exportFile}>
             ↓ {t("exportJson")}
           </button>
           <button className="btn" onClick={() => fileRef.current?.click()}>

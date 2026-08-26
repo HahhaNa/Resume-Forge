@@ -24,7 +24,7 @@ export interface DraftSection {
 }
 
 export interface Draft {
-  source: "tex" | "pdf" | "text";
+  source: "tex" | "pdf" | "docx" | "text";
   profile: Partial<Profile>;
   sections: DraftSection[];
   /** i18n keys, translated at render time */
@@ -52,9 +52,11 @@ export const isSkillsSection = (title: string) => SKILLS_RE.test(title);
 const KNOWN_SECTIONS =
   /^(education|academic background|experience|work experience|professional experience|research experience|industry experience|employment|internships?|projects?|selected projects|personal projects|technical skills|skills|skills? (&|and) (tools|interests)|awards?|honors?|awards? (&|and) honors?|publications?|activities|leadership|volunteering|certifications?|coursework|relevant coursework|summary|profile|objective|interests|extracurriculars?|references)$/i;
 
-// deliberately strict: a bare "Aug" must not make "Augusta, GA" look like a date
+// deliberately strict: a bare "Aug" must not make "Augusta, GA" look like a date, and the
+// numeric form is pinned to a real month so "Ranking 19/188" stays a ranking. `09/26 - 06/28`
+// is common enough on a resume that dropping it costs every period on the page.
 const DATE_RE =
-  /\b(19|20)\d{2}\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(19|20)\d{2}\b|\b(present|current|ongoing|expected|now)\b/i;
+  /\b(19|20)\d{2}\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(19|20)\d{2}\b|\b(0?[1-9]|1[0-2])\/(19|20)?\d{2}\b|\b(present|current|ongoing|expected|now)\b/i;
 
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+\w/;
 const LINKEDIN_RE = /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[\w%-]+\/?/i;
@@ -62,14 +64,23 @@ const GITHUB_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/[\w.-]+\/?/i;
 const PHONE_RE = /(\(?\+?\d[\d\s().+-]{6,}\d)/;
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
+/**
+ * Drop the app's own bold markers. On a heading, an employer, or a date they are decoration the
+ * source file happened to carry — the resume sets those rows from its own style, so keeping the
+ * markers would print literal asterisks. Bullet text keeps its bold: there it means something.
+ */
+const plain = (s: string) => clean(s).replace(/\*\*/g, "").trim();
+
+/** The header prints the URL as written, so strip what nobody types into a resume. */
+const bareUrl = (u: string) => u.replace(/^https?:\/\//, "").replace(/^www\./i, "").replace(/\/$/, "");
 
 function profileFromText(text: string, into: Partial<Profile>) {
   const email = text.match(EMAIL_RE)?.[0];
   if (email && !into.email) into.email = email;
   const li = text.match(LINKEDIN_RE)?.[0];
-  if (li && !into.linkedin) into.linkedin = li.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  if (li && !into.linkedin) into.linkedin = bareUrl(li);
   const gh = text.match(GITHUB_RE)?.[0];
-  if (gh && !into.github) into.github = gh.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  if (gh && !into.github) into.github = bareUrl(gh);
   // strip the things that look like phones but aren't, e.g. a date range
   const phoneLine = text
     .split(/[|·•\n]/)
@@ -566,15 +577,22 @@ export function linesFromPieces(pieces: Piece[], page: number): TextLine[] {
   return out;
 }
 
-const BULLET_GLYPH = /^\s*([•‣◦▪▸·∙●○*+]|[-–—](?=\s))\s*/;
+// `*` and `+` carry the same caveat as the dashes: a marker is followed by a space, so
+// `+46-764574152` stays a phone number instead of losing its country code to the stripper.
+const BULLET_GLYPH = /^\s*([•‣◦▪▸·∙●○]|[-–—*+](?=\s))\s*/;
 
 const isSectionHeading = (l: TextLine, bodySize: number) => {
   const t = clean(l.text);
   if (!t || t.length > 46 || BULLET_GLYPH.test(l.text)) return false;
   if (/[.;,]$/.test(t)) return false;
-  // the name at the top is set far larger than any section rule — don't eat it
-  if (l.size > bodySize * 1.7) return false;
+  // A line that reads "Education" is a heading whatever it is set in, so the name it might be
+  // confused with never gets that far.
   if (KNOWN_SECTIONS.test(t.replace(/[^\w &]/g, "").trim())) return true;
+  // Past the known names it is size that separates a heading from the name above it: headings
+  // run 1.0-1.35x the body, names 1.4x and up. 1.7 was loose enough to let a name set in caps
+  // pass as a heading, which cost the whole header — everything above the first heading is what
+  // the profile is read from, and a name at index 0 leaves nothing there.
+  if (l.size > bodySize * 1.35) return false;
   const letters = t.replace(/[^A-Za-z]/g, "");
   const caps = letters.length >= 3 && letters === letters.toUpperCase();
   // entry names often run a point above the bullets — only a clear jump counts
@@ -593,15 +611,27 @@ const NORM: [RegExp, string][] = [
 ];
 const norm = (s: string) => NORM.reduce((a, [re, r]) => a.replace(re, r), s);
 
-/** Shared by the PDF path and by pasted plain text. */
-export function draftFromLines(input: TextLine[], source: "pdf" | "text"): Draft {
+/**
+ * Shared by the PDF path and by pasted plain text. `links` are the URLs a PDF carries as
+ * annotations rather than as text: a header that reads `LinkedIn | Github` has the profile
+ * addresses in it, just not anywhere the text layer can see them.
+ */
+export function draftFromLines(
+  input: TextLine[],
+  source: "pdf" | "docx" | "text",
+  links: string[] = []
+): Draft {
   const lines = input.map((l) => ({ ...l, text: norm(l.text), right: l.right ? norm(l.right) : undefined }));
   const warnings: string[] = [];
   const profile: Partial<Profile> = {};
   const sizes = lines.map((l) => l.size).sort((a, b) => a - b);
   const bodySize = sizes[Math.floor(sizes.length / 2)] ?? 10;
 
-  const firstHeading = lines.findIndex((l) => isSectionHeading(l, bodySize));
+  // The first line of a resume is the name, never a section rule. Without this the header can
+  // start at index 0 and leave the profile with nothing above it to read.
+  const heading = (l: TextLine, i: number) => i > 0 && isSectionHeading(l, bodySize);
+
+  const firstHeading = lines.findIndex(heading);
   const head = (firstHeading === -1 ? lines.slice(0, 4) : lines.slice(0, firstHeading))
     .map((l) => [l.text, l.right].filter(Boolean).join(" "))
     .join("\n");
@@ -610,6 +640,8 @@ export function draftFromLines(input: TextLine[], source: "pdf" | "text"): Draft
     headLines.find((t) => !EMAIL_RE.test(t) && !/\d/.test(t) && t.split(/\s+/).length <= 5) ?? headLines[0];
   if (nameLine) profile.name = nameLine.replace(/\*\*/g, "");
   profileFromText(head, profile);
+  // text first, annotations second: what the page shows is what the reader will check against
+  if (links.length) profileFromText(links.join("\n"), profile);
 
   const sections: DraftSection[] = [];
   let cur: DraftSection | null = null;
@@ -627,8 +659,8 @@ export function draftFromLines(input: TextLine[], source: "pdf" | "text"): Draft
     const raw = clean(l.text);
     if (!raw) continue;
 
-    if (isSectionHeading(l, bodySize)) {
-      const title = raw.replace(/\s{2,}/g, " ");
+    if (heading(l, i)) {
+      const title = plain(raw);
       curKind = kindForSection(title);
       cur = {
         title,
@@ -649,7 +681,7 @@ export function draftFromLines(input: TextLine[], source: "pdf" | "text"): Draft
     if (cur.type === "skills") {
       const text = [raw.replace(BULLET_GLYPH, ""), l.right].filter(Boolean).join(" ");
       const m = /^(.{1,44}?)\s*[:：]\s*(.+)$/.exec(text);
-      if (m) cur.skills.push({ label: clean(m[1]), items: clean(m[2]) });
+      if (m) cur.skills.push({ label: plain(m[1]), items: clean(m[2]) });
       else if (cur.skills.length) {
         // wrapped continuation of the previous row
         const prev = cur.skills[cur.skills.length - 1];
@@ -685,9 +717,9 @@ export function draftFromLines(input: TextLine[], source: "pdf" | "text"): Draft
       last && !last.bullets.length && !last.title && !!(last.org || last.period || last.location);
     if (isSecondRow && !(dateish && last!.period)) {
       const firstRowDated = !!last!.period;
-      last!.title = raw;
-      if (dateish && !last!.period) last!.period = tail;
-      else if (tail && !last!.location) last!.location = tail;
+      last!.title = plain(raw);
+      if (dateish && !last!.period) last!.period = plain(tail);
+      else if (tail && !last!.location) last!.location = plain(tail);
       // the date sitting on the first row means that row was the role, not the org
       if (firstRowDated && !dateish) [last!.org, last!.title] = [last!.title, last!.org];
       continue;
@@ -697,10 +729,10 @@ export function draftFromLines(input: TextLine[], source: "pdf" | "text"): Draft
     const [head, ...rest] = raw.split(/\s+[|—]\s+/);
     pushEntry({
       kind: curKind,
-      org: clean(head),
-      title: clean(rest.join(" | ")),
-      location: dateish ? "" : tail,
-      period: dateish ? tail : "",
+      org: plain(head),
+      title: plain(rest.join(" | ")),
+      location: dateish ? "" : plain(tail),
+      period: dateish ? plain(tail) : "",
       bullets: [],
     });
   }
@@ -711,24 +743,51 @@ export function draftFromLines(input: TextLine[], source: "pdf" | "text"): Draft
   }
   const kept = sections.filter((s) => (s.type === "skills" ? s.skills.length : s.entries.length));
 
-  if (!kept.length) warnings.push("warnNoLayout");
-  if (source === "pdf")
-    warnings.push("warnPdfGuess");
+  // A PDF with no text runs at all is a scan, not an unusual layout, and saying "no sections
+  // were recognised" sends the reader off to fix a résumé that is fine.
+  if (source === "pdf" && !input.length) warnings.push("warnPdfNoText");
+  else {
+    if (!kept.length) warnings.push("warnNoLayout");
+    // both are laid out for a reader, not for a parser, so the split is a guess either way
+    if (source === "pdf") warnings.push("warnPdfGuess");
+    if (source === "docx") warnings.push("warnDocxGuess");
+  }
 
   return { source, profile, sections: kept, warnings };
 }
 
-/** Pasted plain text — no coordinates, so indentation stands in for x. */
+/**
+ * Markdown markup that would otherwise be read as content: `## Education` has to arrive as
+ * "Education" for the section matcher to know it, and a `---` rule looks like a name if it lands
+ * on the first line. `**bold**` is left alone — the app writes bold the same way.
+ */
+const MD_HEADING = /^\s{0,3}#{1,6}\s+/;
+const MD_RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
+const MD_FENCE = /^\s{0,3}(```|~~~)/;
+
+/**
+ * Pasted plain text and text-shaped files — no coordinates, so indentation stands in for x. A
+ * heading's own `#` is dropped from the text but kept as size, which is what marks it a section
+ * the same way a larger face does in a PDF.
+ */
 export function parsePlainText(src: string): Draft {
-  const lines: TextLine[] = src
-    .split(/\r?\n/)
-    .filter((l) => l.trim())
-    .map((l) => ({
-      text: l.trim(),
-      x: (l.match(/^\s*/)?.[0].length ?? 0) * 3,
-      size: 10,
+  const lines: TextLine[] = [];
+  let fenced = false;
+  for (const line of src.split(/\r?\n/)) {
+    if (MD_FENCE.test(line)) {
+      // a fenced block is quoted content, not markup — keep the lines, drop the fence
+      fenced = !fenced;
+      continue;
+    }
+    if (!line.trim() || (!fenced && MD_RULE.test(line))) continue;
+    const heading = !fenced && MD_HEADING.test(line);
+    lines.push({
+      text: line.replace(MD_HEADING, "").trim(),
+      x: (line.match(/^\s*/)?.[0].length ?? 0) * 3,
+      size: heading ? 12 : 10,
       page: 1,
-    }));
+    });
+  }
   return draftFromLines(lines, "text");
 }
 

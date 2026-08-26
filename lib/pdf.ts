@@ -17,12 +17,20 @@ interface PdfTextItem {
   width?: number;
   height?: number;
 }
+interface PdfAnnotation {
+  url?: string;
+  unsafeUrl?: string;
+}
+interface PdfPage {
+  getTextContent: () => Promise<{ items: PdfTextItem[] }>;
+  getAnnotations: () => Promise<PdfAnnotation[]>;
+}
 interface PdfJs {
   GlobalWorkerOptions: { workerSrc: string };
   getDocument: (opts: { data: Uint8Array }) => {
     promise: Promise<{
       numPages: number;
-      getPage: (n: number) => Promise<{ getTextContent: () => Promise<{ items: PdfTextItem[] }> }>;
+      getPage: (n: number) => Promise<PdfPage>;
       destroy: () => Promise<void>;
     }>;
   };
@@ -40,11 +48,16 @@ function loadPdfJs(): Promise<PdfJs> {
   return lib;
 }
 
-export async function pdfToLines(file: File): Promise<TextLine[]> {
+/**
+ * Lines plus the URLs the pages link to. A contact row that reads `LinkedIn | Github` keeps its
+ * addresses in the link annotations and nowhere else, so the text layer alone loses them.
+ */
+export async function pdfToLines(file: File): Promise<{ lines: TextLine[]; links: string[] }> {
   const pdfjs = await loadPdfJs();
   const data = new Uint8Array(await file.arrayBuffer());
   const doc = await pdfjs.getDocument({ data }).promise;
-  const out: TextLine[] = [];
+  const lines: TextLine[] = [];
+  const links: string[] = [];
 
   try {
     for (let p = 1; p <= doc.numPages; p++) {
@@ -62,10 +75,16 @@ export async function pdfToLines(file: File): Promise<TextLine[]> {
           size: Math.hypot(tr[1], tr[3]) || item.height || 10,
         });
       }
-      out.push(...linesFromPieces(pieces, p));
+      lines.push(...linesFromPieces(pieces, p));
+      // only the header's links are ever the profile's, and a resume that links out of a bullet
+      // would otherwise donate that URL to it — so keep page order and let the caller take first
+      for (const a of await page.getAnnotations()) {
+        const url = a.url ?? a.unsafeUrl;
+        if (url && !links.includes(url)) links.push(url);
+      }
     }
   } finally {
     await doc.destroy();
   }
-  return out;
+  return { lines, links };
 }

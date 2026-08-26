@@ -150,7 +150,7 @@ const dict = {
 
     importResume: "Import an existing résumé",
     importResumeNote:
-      "Drop the résumé you already have — a .pdf or a LaTeX .tex — and it becomes your bullet library and a first variant. Everything stays in this browser.",
+      "Drop the résumé you already have — a .pdf, a LaTeX .tex, or Markdown / plain text — and it becomes your bullet library and a first variant. Everything stays in this browser.",
     importDrop: "Drop a file here, or click to choose",
     importParsing: "Reading…",
     importPaste: "…or paste LaTeX / plain text",
@@ -169,6 +169,9 @@ const dict = {
     warnNoSections: "No \\section{...} blocks were found, so there is nothing to import.",
     warnNoLayout: "No sections were recognised — the layout may be unusual.",
     warnPdfGuess: "PDF layout is guesswork: check the entry / role / date split before importing.",
+    warnDocxGuess: "Word layout is guesswork: check the entry / role / date split before importing.",
+    warnPdfNoText:
+      "This PDF has no text in it — it is a scan or an export of images. Save a text PDF from the original, or paste the text below.",
 
     exportJson: "Export JSON",
     importJson: "Import JSON",
@@ -390,7 +393,7 @@ const dict = {
 
     importResume: "匯入舊履歷",
     importResumeNote:
-      "把你現有的履歷丟進來（.pdf 或 LaTeX .tex），系統會拆成條目庫並自動建立第一個版本。資料只留在這台瀏覽器。",
+      "把你現有的履歷丟進來（.pdf、LaTeX .tex，或 Markdown／純文字），系統會拆成條目庫並自動建立第一個版本。資料只留在這台瀏覽器。",
     importDrop: "把檔案拖進來，或點一下選擇",
     importParsing: "解析中…",
     importPaste: "…或直接貼上 LaTeX／純文字",
@@ -409,6 +412,8 @@ const dict = {
     warnNoSections: "找不到 \\section{...}，沒有東西可以匯入。",
     warnNoLayout: "認不出任何區塊，這份排版可能比較特別。",
     warnPdfGuess: "PDF 的版面是用猜的，匯入前請確認經歷／職稱／日期有沒有分錯。",
+    warnDocxGuess: "Word 的版面是用猜的，匯入前請確認經歷／職稱／日期有沒有分錯。",
+    warnPdfNoText: "這份 PDF 裡沒有文字，是掃描檔或圖片輸出。請從原始檔另存成文字版 PDF，或直接把內容貼到下面。",
 
     exportJson: "匯出 JSON",
     importJson: "匯入 JSON",

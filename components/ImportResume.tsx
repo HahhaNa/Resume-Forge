@@ -40,7 +40,12 @@ export default function ImportResume({ open, onClose }: { open: boolean; onClose
       if (ext === "pdf") {
         const { pdfToLines } = await import("@/lib/pdf");
         const { draftFromLines } = await import("@/lib/import");
-        draft = draftFromLines(await pdfToLines(file), "pdf");
+        const { lines, links } = await pdfToLines(file);
+        draft = draftFromLines(lines, "pdf", links);
+      } else if (ext === "docx") {
+        const { docxToLines } = await import("@/lib/docx");
+        const { draftFromLines } = await import("@/lib/import");
+        draft = draftFromLines(await docxToLines(file), "docx");
       } else if (ext === "tex") {
         draft = parseTex(await file.text());
       } else {
@@ -176,13 +181,15 @@ export default function ImportResume({ open, onClose }: { open: boolean; onClose
               {phase.k === "busy" ? t("importParsing") : t("importDrop")}
             </div>
             <div className="mt-0.5 text-[11px]" style={{ color: "var(--muted)" }}>
-              .pdf · .tex · .txt
+              .pdf · .docx · .tex · .md · .txt
             </div>
           </div>
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.tex,.txt,application/pdf,text/plain"
+            /* dropping a file ignores this list, so anything missing from it is a format the
+               picker refuses and the drop zone accepts — keep the two agreeing */
+            accept=".pdf,.docx,.tex,.txt,.md,.markdown,.text,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="hidden"
             onChange={(e) => e.target.files?.[0] && take(e.target.files[0])}
           />

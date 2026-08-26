@@ -442,6 +442,8 @@ components/
   resume/CompareVariants.tsx  variant diff
   ui/bits.tsx           shared inputs, bars, modal
 lib/
+  *.test.ts             vitest, node environment — the pure modules below
+  migrate.ts            persisted state from an older release, brought up to date
   types.ts              the whole data model
   library.ts            entry ↔ variant rules: which section, what order, which bullets
   store.ts              zustand store, persisted

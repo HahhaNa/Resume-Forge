@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SEED } from "./seed";
+import { looksUntouched, migratePersisted } from "./migrate";
 import { uid, today } from "./id";
 import {
   addEntryToVariant,
@@ -149,18 +150,6 @@ interface Store extends UI {
 }
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
-
-/**
- * Is this still the demo? Only ever asked once, of an install that predates
- * `ownWorkAt`, and only to decide whether to warn about a missing backup — so
- * three cheap signals beat a deep comparison against SEED. Wrong in the safe
- * direction either way: a false "untouched" costs one edit before the warning
- * appears, and a false "touched" shows a backup prompt a little early.
- */
-const looksUntouched = (db: DB) =>
-  db.applications.length === 0 &&
-  db.entries.length === SEED.entries.length &&
-  db.profile.name === SEED.profile.name;
 
 /** A restore point for the database as it stands, newest first, oldest trimmed. */
 const withRestorePoint = (s: { db: DB; restorePoints: RestorePoint[] }, label: string) =>
@@ -1141,24 +1130,8 @@ export const useStore = create<Store>()(
         activeVariantId,
         ownWorkAt,
       }),
-      /** v1 had no tag vocabulary and no restore points: recover the former from the data. */
-      migrate: (persisted, from) => {
-        const s = persisted as Partial<Store>;
-        if (from < 2) {
-          s.restorePoints ??= [];
-          if (s.db && !s.db.tags) {
-            const seen = new Set<string>();
-            for (const v of s.db.variants ?? []) if (v.name) seen.add(v.name);
-            for (const e of s.db.entries ?? []) {
-              for (const x of e.tags) seen.add(x);
-              for (const b of e.bullets) for (const x of b.tags) seen.add(x);
-            }
-            for (const k of s.db.skills ?? []) for (const x of k.tags) seen.add(x);
-            s.db.tags = seen.size ? [...seen] : [...SEED.tags];
-          }
-        }
-        return s as Store;
-      },
+      /** Older saved data, brought up to the current shape. See `lib/migrate.ts`. */
+      migrate: (persisted, from) => migratePersisted(persisted, from) as Store,
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         state.hydrated = true;

@@ -231,6 +231,7 @@ in the whole repo is a 60-line read-only proxy for Deep-ML's public catalogue.
 app/        one folder per tab, plus api/deepml/ (the only server code)
 components/ AppShell, the resume preview, entry editor, shared UI
 lib/        types, store, resolve() → LaTeX, backup, import, i18n, seed data
+lib/*.test.ts  the pure half, under test — run with npm test
 ```
 
 `lib/resume.ts`'s `resolve()` is the single source of truth: the on-screen preview and the exported
@@ -241,6 +242,16 @@ LaTeX both read from it, so what you see is what compiles.
 Issues and pull requests are welcome. Good first areas: résumé templates beyond the default one,
 importers for other formats, more job-board URL patterns in `lib/ats.ts`, and translations
 (strings live in `lib/i18n.ts`).
+
+Before you open a PR:
+
+```bash
+npm run typecheck && npm test
+```
+
+The tests cover `lib/` — LaTeX generation, résumé import, dates, variant rules, and the schema
+migration. They run in a couple of hundred milliseconds, so `npm run test:watch` while you work is
+comfortable. The same two commands plus `npm run build` run in CI on every push.
 
 ## License
 

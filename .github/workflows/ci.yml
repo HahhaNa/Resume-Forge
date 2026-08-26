@@ -1,0 +1,37 @@
+# The safety net for a project with one maintainer: the checks that would otherwise
+# only run when someone remembers to run them.
+#
+# `typecheck` and `test` are the fast pair and catch almost everything. `build` is
+# here because Next has failure modes TypeScript does not see — a server component
+# importing a client-only module, for instance — and finding those on a push is
+# cheaper than finding them on a deploy.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# a newer push replaces the run in flight; nothing here is worth queueing for
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` installs exactly what package-lock.json pins, and runs the
+      # postinstall that copies pdf.js into public/ — the build needs it there
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

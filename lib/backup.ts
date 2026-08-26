@@ -112,6 +112,8 @@ interface Backup {
   takeIncoming: () => void;
   keepLocal: () => Promise<void>;
   markExported: () => void;
+  /** Write the file now instead of a second from now. See the Save button. */
+  saveNow: () => Promise<void>;
 }
 
 let handle: FileHandle | null = null;
@@ -225,6 +227,19 @@ export const useBackup = create<Backup>()(
       },
 
       markExported: () => set({ lastExportAt: stamp() }),
+
+      /**
+       * Everything is already saved — that is the point of the debounce and of
+       * `persist`. What this is for is the person who cannot see that, and who
+       * would like to press something and be told. So it cuts the wait short
+       * and writes the file this instant, and the answer it gives back is a
+       * true one rather than a reassuring animation.
+       */
+      saveNow: async () => {
+        if (timer) clearTimeout(timer);
+        timer = null;
+        await flush();
+      },
     }),
     {
       name: "resume-forge-backup",

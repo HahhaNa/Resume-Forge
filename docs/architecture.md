@@ -186,7 +186,8 @@ if the Worker vanished tomorrow every user's data would still be in their browse
 file, because sync is a convenience layer and never the source of truth. That property is what makes
 the whole thing cheap to own.
 
-**Verdict: yes**, once phone↔laptop sync is the priority. It is about a week, not a project.
+**Verdict: yes**, once phone↔laptop sync is the priority. It is about a week, not a project — but
+[§4](#4-sync) puts the user's own cloud ahead of it, on rescue rather than on cost.
 
 ### The thing worth holding on to
 
@@ -217,7 +218,7 @@ flowchart TB
     ST --> PORT{{Storage port}}
     PORT --> IDB[(IndexedDB<br/>source of truth)]
     PORT --> FILE[(File handle<br/>Chrome/Edge desktop)]
-    PORT --> REMOTE[(Encrypted blob store<br/>paired by QR — or a Gist)]
+    PORT --> REMOTE[(The user's own cloud<br/>Drive / Dropbox app folder)]
     ST --> MERGE[merge.ts<br/>per-record LWW]
     MERGE --> PORT
   end
@@ -317,36 +318,59 @@ The file-in-a-synced-folder approach stays, and stays the recommendation on desk
 reach a phone: iCloud Drive and Dropbox do not hand a writable file handle to a web page, and mobile
 browsers have no picker to give one. So the phone needs a remote.
 
-| Option | Setup the user does | Works on | Verdict |
+The question is not which remote is most elegant. It is which one a person can still get their
+résumé out of eighteen months later, on a new phone, having forgotten every detail of how this app
+worked — including that there was something they were supposed to keep safe.
+
+| Option | Setup the user does | If they forget everything | Verdict |
 |---|---|---|---|
-| **Encrypted blob store + sync code** | Scan a QR code | Everywhere | **Ship this.** No account, server holds ciphertext, ~a week to build, free to run |
-| Private GitHub Gist | Paste a fine-grained PAT | Everywhere | **Good developer-facing alternative**, and needs no server of ours at all. Token pasting is too much for a non-technical user, so this is the second option, not the first |
-| Dropbox / Google Drive app folder | OAuth, in-browser | Everywhere | Viable; more moving parts (register an app), and it puts a third party in the loop |
-| WebRTC / P2P | none | Both devices awake at once | Rejected — needs a signalling server anyway, and the devices rarely are |
-| Hosted DB with accounts | Sign up | Everywhere | Rejected — see [above](#the-kind-with-accounts--supabase-firebase-your-own-postgres--auth) |
+| **The user's own cloud** — Google Drive or Dropbox app folder | Sign in to an account they already have | The file is in their own Drive, under a name they can read. They can open it without us, on any device | **Ship this first.** The only option with a recovery story an ordinary person can carry out alone |
+| Encrypted blob store + sync code | Scan a QR code | Nothing. The code *was* the key, and there is no reset | **Second**, and an explicit choice rather than the default: for people who would rather no third party held the bytes |
+| Private GitHub Gist | Paste a fine-grained PAT | The Gist is in their GitHub account | Developer-facing alternative, and needs no server of ours at all. Token pasting is too much for everyone else |
+| Dropbox / Drive via full-account scope | OAuth, in-browser | Same as the app folder | Rejected — asking for the whole Drive to store one file is a worse bargain than the app folder, for identical function |
+| WebRTC / P2P | none | — | Rejected — needs a signalling server anyway, and the devices are rarely both awake |
+| Hosted DB with accounts | Sign up | A password reset we operate | Rejected — see [above](#the-kind-with-accounts--supabase-firebase-your-own-postgres--auth) |
 
-**The blob store, concretely.** `sync/` in this repo holds a Cloudflare Worker with two routes and a
-KV namespace. The client:
+**Why the sync code lost the default.** It is the better answer on privacy and the better answer on
+cost, and it is still worth building. What it cannot do is survive the ordinary case: someone pairs
+their phone in March, never thinks about it again, and loses the laptop in October — by which time
+the sync code is off a screenshot they deleted, or in a notes app they stopped using. There is no
+recovery path *by design*, because that is exactly what "we cannot read it" costs. For a tool used
+by people who write LaTeX, that trade is fine and they will keep the code somewhere sensible. For a
+tool meant to be handed to a friend who is job-hunting, an unrecoverable secret is not a feature; it
+is the failure mode, and it arrives silently, months later, at the worst possible moment.
 
-1. generates a 128-bit sync code, rendered as a QR and as words for typing;
-2. derives an AES-GCM key from it with PBKDF2, and derives the storage id as a *separate* hash of
-   the same code — so the id the server sees never reveals the key;
-3. `PUT`s the encrypted `DB` on a debounce, `GET`s and merges on launch and on focus.
+**The app folder, concretely.** Google's `drive.file` scope grants access to the files *this app
+created* and nothing else — not the rest of the Drive, not even a listing of it. That boundary is
+enforced by Google rather than by a promise in our README, and because the scope is non-sensitive
+there is no verification review to pass: a fork registers its own OAuth client in an afternoon.
+Dropbox's app folder works the same way and is the same adapter behind the [storage
+port](#2-one-storage-port-three-adapters). What gets written is the same `resume-forge.json` the
+desktop backup already writes, so the phone's copy and the laptop's copy are one artefact and
+`lib/merge.ts` reconciles both without a second code path.
 
-The server sees an opaque id and a blob of ciphertext. It has no idea whose it is, what is in it, or
-that a résumé is involved. Blobs expire after 90 days untouched, which is the whole of the retention
-policy.
+**What this costs, said plainly.** The file in the user's Drive is *not* encrypted, and it easily
+could be — the sealing code is the same either way. The reason not to is the whole argument above:
+an encrypted file in their Drive is a file they cannot recover from either, which pays the third
+party's price and keeps none of the rescue.
 
-Anyone uncomfortable with even that runs `npx wrangler deploy` on their own account and changes one
-URL — or uses the Gist adapter and has no server in the picture whatsoever.
+So this is a real change to what the project promises, and it is worth being exact about which
+promise. The line in [The principle](#the-principle) is about *us*: no accounts on a database we
+operate, nothing readable on a server we run, no login between anyone and their own work. A file in
+the user's own Drive breaks none of those — it is a provider they already chose, holding a file they
+can see in a folder and revoke in one click. But the README currently says nothing leaves the
+browser, and for anyone who switches this on, that stops being true. So: sync stays **off** by
+default, the switch says plainly what leaves the browser and where it lands, and the README grows a
+sentence. A promise that quietly narrows is worse than one that was never made.
 
-**Two things to get right:**
+**Two things to get right, whichever adapter is in use:**
 
-- **Sync is never the source of truth.** The local IndexedDB copy is. If the Worker is down the app
-  keeps working and syncs later. Nothing in the UI should ever block on the network.
-- **Losing the sync code means losing the ciphertext**, because there is deliberately no recovery
-  path — that is what "we cannot read it" means. Say so at the moment the code is created, and push
-  the user to keep the backup file as well.
+- **Sync is never the source of truth.** The local IndexedDB copy is. If Drive is unreachable or the
+  Worker is down, the app keeps working and syncs later. Nothing in the UI ever blocks on the
+  network.
+- **Every adapter is optional, and removable.** A fork with no OAuth client registered simply does
+  not offer that option, and nothing else changes. No remote is ever required to open the app, and
+  no remote is ever the only place something lives.
 
 ### 5. Mobile is a different app shape
 
@@ -390,8 +414,8 @@ to break.
 | **1** · a weekend | Storage port · IndexedDB as source of truth · `storage.persist()` · PWA manifest + service worker · name the unsafe combination out loud | The iOS seven-day case is live right now and completely silent |
 | **2** · ~2 days | Schema v3 timestamps + tombstones · `lib/merge.ts` · file backup merges instead of halting | Must precede any sync, and the migration is cheap now and expensive once there are users |
 | **3** · ~1 week | Bottom-nav mobile layout · read-only résumé view · share-sheet export · Web Share Target | The phone becomes genuinely useful, not merely survivable |
-| **4** · ~1 week | Worker + KV · WebCrypto seal/open · QR pairing · debounced push, merge on focus. Gist adapter alongside, for people who would rather have no server at all | Phone ↔ laptop, with nothing readable leaving the browser |
-| **5** · later | Drive adapter · more résumé templates · a proper docs site | Nice to have, never required |
+| **4** · ~1 week | Drive / Dropbox app-folder adapter · OAuth in the browser (`drive.file`) · debounced push, merge on focus · a switch that says what leaves the browser | Phone ↔ laptop, and the user can get the file back without us |
+| **5** · later | Worker + KV · WebCrypto seal/open · QR pairing, for anyone who would rather no third party held the bytes · Gist adapter · more résumé templates · a proper docs site | Nice to have, never required |
 
 **Now** is worth doing before anything else on this list: it is a few hours, it needs no new
 concepts, and it converts the feature that already exists from something you have to know about into

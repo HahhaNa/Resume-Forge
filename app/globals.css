@@ -483,10 +483,13 @@ body {
     margin: 0 !important;
     overflow: visible !important;
   }
-  /* width/padding are set per variant alongside the @page box — see printCss() in Preview.tsx */
+  /* width/padding are set per variant alongside the @page box — see printCss() in Preview.tsx.
+     The whole-page floor the preview draws its empty tail with is a screen affordance: paper is
+     already page-sized here, and carrying the floor over would push a blank page out the back. */
   .paper {
     box-shadow: none !important;
     transform: none !important;
     margin: 0 !important;
+    min-height: 0 !important;
   }
 }

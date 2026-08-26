@@ -89,13 +89,22 @@ const BULLET_INDENT = 0.18 * PX_IN;
  * the date/URL header it otherwise stamps into the page margin, checkbox or not. Once the resume
  * spills over, the insets have to move into `@page` so pages after the first are inset too — the
  * header may reappear there, but a page starting flush against the paper edge is worse.
+ *
+ * `zoom` is what keeps the printed page count honest. Chrome paginates the preview's own pixels,
+ * and a letter page holds `contentH` of them — but everything the app says about pages (the fill
+ * gauge, the break markers, the branch below) counts a page as `contentH / CAL`, because that is
+ * how much preview height pdflatex fits on one. Printed at 1:1 the two disagree by CAL, so a
+ * resume the gauge calls "fits" laid one line onto a second, otherwise blank page. Scaling by CAL
+ * puts the browser on the preview's own ruler: the PDF then breaks where the markers say it will
+ * and lands on the same page count as the compiled .tex. The insets are divided back out so the
+ * margins print at the size they are written.
  */
 function printCss(m: number, pages: number) {
   const side = (m + 0.06).toFixed(3);
   const box =
     Math.ceil(pages) <= 1
-      ? `@page{size:letter;margin:0}.paper{width:8.5in!important;padding:${m}in ${side}in!important}`
-      : `@page{size:letter;margin:${m}in ${side}in}.paper{width:auto!important;padding:0!important}`;
+      ? `@page{size:letter;margin:0}.paper{zoom:${CAL};width:calc(8.5in/${CAL})!important;padding:calc(${m}in/${CAL}) calc(${side}in/${CAL})!important}`
+      : `@page{size:letter;margin:${m}in ${side}in}.paper{zoom:${CAL};width:auto!important;padding:0!important}`;
   return `@media print{${box}}`;
 }
 
@@ -171,6 +180,15 @@ export default function Preview({
   });
 
   const pageBreaks = Math.max(0, Math.ceil(pages) - 1);
+  /**
+   * The sheet is drawn out to whole pages even when the resume stops short of one. Sized to its
+   * ink instead, the preview showed a full-looking page and the empty tail only turned up in the
+   * downloaded PDF — a resume that fills 0.84 of a page prints an inch and a half of white, and
+   * the reader had nowhere to see that coming. The paper carries it as a floor, so the white
+   * area is the paper, not a gap under it.
+   */
+  const paperH =
+    2 * m * PX_IN + Math.max(paperRef.current?.scrollHeight ?? contentH, pageH * Math.max(1, Math.ceil(pages)));
 
   return (
     <div ref={wrapRef} className="relative w-full">
@@ -179,16 +197,13 @@ export default function Preview({
       <style dangerouslySetInnerHTML={{ __html: printCss(m, pages) }} />
       <div
         className="print-sheet"
-        style={{
-          width: PAGE_W * scale,
-          height: (2 * m * PX_IN + (paperRef.current?.scrollHeight ?? contentH)) * scale,
-          margin: "0 auto",
-        }}
+        style={{ width: PAGE_W * scale, height: paperH * scale, margin: "0 auto" }}
       >
         <div
           className="paper relative"
           style={{
             width: PAGE_W,
+            minHeight: paperH,
             padding: `${m * PX_IN}px ${(m + 0.06) * PX_IN}px`,
             transform: `scale(${scale})`,
             transformOrigin: "top left",

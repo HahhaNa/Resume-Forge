@@ -225,7 +225,7 @@ export default function Tailor() {
               sub={<Bar value={fill} max={1} color={fillTone(fill)} height={6} />}
               accent={fillTone(fill)}
             />
-            <Stat k={t("chosenLines")} v={out.result.chosen.length} sub={`${out.judged.length} considered`} />
+            <Stat k={t("chosenLines")} v={out.result.chosen.length} sub={`${out.considered.length} considered`} />
             <Stat
               k={t("requirements")}
               v={`${out.requirements.length - out.gaps.length}/${out.requirements.length}`}

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "vitest run lib/eval.test.ts --reporter=verbose",
     "postinstall": "node -e \"for (const f of ['pdf.min.mjs','pdf.worker.min.mjs']) require('fs').copyFileSync('node_modules/pdfjs-dist/legacy/build/'+f,'public/'+f)\""
   },
   "dependencies": {

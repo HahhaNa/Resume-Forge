@@ -341,18 +341,31 @@ export function retrieve(
  * How much of a requirement a line has to cover before it is called evidence
  * for it.
  *
- * Calibrated by running the starter library against two postings: one it
- * genuinely fits, and one from a different profession entirely. The on-domain
- * requirements it can answer land between 0.21 and 0.38; the off-domain ones
- * top out at 0.12, all of them single incidental words ("background",
- * "analysis"). 0.2 sits in that gap. The numbers are low in absolute terms
- * because alias expansion makes a requirement ask for more terms than any one
- * line could carry — what matters is the separation, not the scale.
+ * Set by `lib/eval/` rather than by feel. The whole answer key, retrieval only:
  *
- * Worth re-measuring the same way if ALIASES grows much, since that moves the
- * denominator.
+ * ```
+ *   STRONG   recall   precision   traps   gap calls
+ *    0.08      86%        51%       0%       100%
+ *    0.10      77%        57%       0%       100%
+ *    0.12      68%        60%       0%       100%
+ *    0.14      55%        71%       0%        88%
+ *    0.16      55%        71%       0%        88%
+ *    0.20      50%        69%       0%        82%
+ * ```
+ *
+ * 0.14 over the 0.2 this used to be, because 0.2 is beaten on every column at
+ * once — it was not a precision/recall trade, it was just too strict. 0.14 over
+ * the looser end because of which mistake costs more: a line wrongly cited as
+ * evidence is a claim on a résumé that an interview will test, while a line
+ * that misses the cut is usually still on the page as filler and is listed
+ * under "did not fit" either way.
+ *
+ * The 12% of gap calls still wrong at 0.14 are all in the `vocabulary-gap`
+ * case, which is in the key precisely because lexical matching cannot do it.
+ * Re-measure with `npm run eval` after touching ALIASES, the BM25 constants, or
+ * the way `cover` is computed — all three move this.
  */
-export const STRONG = 0.2;
+export const STRONG = 0.14;
 
 /** Bullets grouped under the entry they belong to — what the packer works in. */
 export function byEntry(db: DB, cands: Candidate[]): Map<Entry, Candidate[]> {

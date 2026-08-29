@@ -240,7 +240,7 @@ npx vercel --prod
 ## How it's built
 
 Next.js 15 (App Router) · TypeScript · Tailwind · Zustand · LangChain + LangGraph for the tailoring
-agent. About 13k lines. The only server-side file in the whole repo is a 60-line read-only proxy for
+agent, with an answer key under `lib/eval/` that `npm test` scores it against. About 13k lines. The only server-side file in the whole repo is a 60-line read-only proxy for
 Deep-ML's public catalogue — the model clients run in your browser, which is why there is still
 nowhere for us to hold a key or read a résumé.
 

@@ -493,6 +493,10 @@ lib/
   pack.ts               scores + fit.ts -> exactly one page (knapsack with setup costs)
   retrieve.ts           BM25 over your own bullets; no embeddings, no key, works offline
   agent.ts              the LangGraph loop: read, recall, judge (fan-out), fit, critique
+  eval/corpus.ts        a fixed CV to measure against — deliberately not seed.ts
+  eval/cases.ts         the answer key: per requirement, what is evidence and what is a trap
+  eval/score.ts         counts in, micro-averaged rates out
+  eval/run.ts           drives the real agent; retrieval mode in CI, model mode on demand
   llm.ts                provider config and the browser-side model client
   import.ts             PDF / LaTeX résumé import
   ats.ts                job-board URL -> company, portal, role
@@ -544,3 +548,41 @@ twelve simultaneous requests is a rate limit on a fresh API key and a stalled la
 The property all of this rests on — that every judge in a run sends the same prefix — is invisible
 in the code and holds only because `fanOut` hands each task the same shortlist. `fanout.test.ts`
 asserts it directly, with a stand-in model.
+
+### Measuring it
+
+`lib/eval/` is an answer key: five postings' worth of requirements, hand-labelled against a fixed
+fifteen-line CV. Each requirement carries two lists — the lines that genuinely are evidence, and
+**traps**, lines on the same topic that are not. Traps are the half that matters. A matcher that
+returns everything on the right topic scores perfectly on recall and is useless, and the first
+version of this file's own scorer only counted mistakes it had predicted, which held precision at a
+flattering 100% while the real number was 51%.
+
+Retrieval mode needs no key and no network, so it runs in `npm test` on every commit. `npm run eval`
+prints it in full; `EVAL_MODEL=… npm run eval` runs the same key through a provider, which is the
+only honest way to answer what connecting a model buys.
+
+```
+case               shortlist    recall   precis.     traps      gaps
+ml-inference            100%       56%       56%        0%      100%
+frontend                100%       67%      100%        0%      100%
+hardware                100%       75%       75%        0%      100%
+vocabulary-gap          100%        0%        —         0%        0%
+off-domain                —         —         —         —       100%
+total                   100%       55%       71%        0%       88%
+```
+
+Read it as three findings:
+
+- **Retrieval is not the bottleneck.** Every labelled line reaches the judges. Whatever is wrong is
+  downstream of BM25, which is the argument against reaching for embeddings.
+- **`STRONG` was simply too strict.** The sweep in `retrieve.ts` shows 0.2 losing to 0.14 on all four
+  columns at once — not a precision/recall trade, just a worse number. It had been set by feel, and
+  nothing before this could tell.
+- **`vocabulary-gap` fails, and stays in the report.** It is the case where the posting and the CV
+  describe the same work in different words. Deleting it would raise the average and hide the one
+  thing a model is actually for; the test asserts it *keeps* failing, so if lexical matching ever
+  starts passing it, the claim in these docs gets corrected rather than the evidence quietly dropped.
+
+What the report does not yet cover: the `read` stage has no key of its own, and the model path is
+measured only when someone runs it.

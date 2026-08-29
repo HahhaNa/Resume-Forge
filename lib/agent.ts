@@ -378,6 +378,27 @@ Related terms: ${r.keywords.join(", ") || "—"}
 Which of the CV lines above are evidence for this one requirement?`;
 }
 
+/**
+ * The shortlist `recall` builds on a given round — later rounds search harder,
+ * because the earlier one already missed.
+ *
+ * Exported because the eval harness measures retrieval as its own stage, and a
+ * second copy of these numbers would quietly stop describing what the agent
+ * actually does the first time one of them was tuned.
+ */
+export function shortlistFor(
+  index: ReturnType<typeof buildIndex>,
+  queries: string[],
+  round = 0,
+  opts: { tags?: string[] } = {}
+): Candidate[] {
+  return retrieve(index, queries, {
+    tags: opts.tags,
+    perReq: 8 + round * 6,
+    limit: 40 + round * 30,
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * scoring a line for the packer
  * ------------------------------------------------------------------ */
@@ -499,6 +520,15 @@ export interface Judged {
 
 export interface TailorResult {
   requirements: Requirement[];
+  /**
+   * Every line retrieval put in front of the judges, by id.
+   *
+   * The ceiling on the whole run: a line that is not in here was never
+   * considered for anything, whatever the model would have made of it. Because
+   * the fan-out hands every judge the same shortlist, this is one set rather
+   * than one per requirement.
+   */
+  considered: string[];
   /** every line the run scored, with what it thought */
   judged: Judged[];
   result: PackResult;
@@ -620,9 +650,7 @@ export async function tailor(input: TailorInput): Promise<TailorResult> {
 
   /* --- recall ----------------------------------------------------- */
   const recall = async (s: typeof State.State) => {
-    /* a later round searches harder, because the first one already missed */
-    const perReq = 8 + s.round * 6;
-    const cands = retrieve(index, s.queries, { tags: input.tags, perReq, limit: 40 + s.round * 30 });
+    const cands = shortlistFor(index, s.queries, s.round, { tags: input.tags });
     return {
       candidates: cands,
       steps: say("recall", `${cands.length} lines shortlisted from ${docs.length}`, s.round),
@@ -796,6 +824,7 @@ export async function tailor(input: TailorInput): Promise<TailorResult> {
 
   return {
     requirements: out.requirements,
+    considered: out.candidates.map((c) => c.doc.id),
     judged,
     result: out.result ?? pack(input.db, input.base, [], { pages: input.pages }),
     gaps: out.gaps.map((i) => out.requirements[i]).filter(Boolean),

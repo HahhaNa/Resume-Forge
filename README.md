@@ -18,6 +18,151 @@ Free · open source · no sign-up · nothing leaves your browser unless you conn
 
 ---
 
+## Architecture
+
+The Tailor tab is the part worth reading code for. You paste a job posting; it returns a résumé
+filled to **exactly one page** with the lines of your own history that answer it — and, more
+usefully, the list of requirements that **nothing** in your history answers.
+
+### The graph
+
+```mermaid
+flowchart LR
+  S([start]) --> read
+  read["<b>read</b><br/>posting → requirements"] --> recall
+  recall["<b>recall</b><br/>BM25 over your own bullets"] -->|Send × N| judge
+  recall -.->|no model connected| score
+  judge["<b>judgeOne</b><br/>one per requirement,<br/>in parallel"] --> fit
+  score["<b>score</b><br/>retrieval only"] --> fit
+  fit["<b>fit</b><br/>knapsack onto one page"] --> critique
+  critique{"<b>critique</b><br/>anything unanswered?"} -->|terms not yet searched| widen
+  critique -->|no, or nowhere new to look| E([done])
+  widen["<b>widen</b><br/>add the model's own keywords"] --> recall
+```
+
+Seven nodes, one loop. `critique → widen → recall` is what makes this an agent rather than a
+pipeline: the first search uses the posting's own words, so the requirement it cannot answer is
+precisely the one whose evidence is phrased differently everywhere in your library. The page that
+comes out is checked back against the requirements that went in, and whatever is unanswered is
+searched again with terms the model itself proposed. It goes round at most twice, and only when the
+gap has keywords the previous round never searched — re-running the same query would return the same
+rows and burn another fan-out to say so.
+
+**The model ranks; it never packs.** Ask one to fill exactly one page and it agrees, confidently, at
+1.3 pages, because nothing in a prompt can see a line break. `fit` is a knapsack with setup costs —
+a bullet costs a line, but the first bullet of an entry drags in its heading and the first entry of a
+section drags in the rule — against geometry re-derived from the same table the LaTeX preamble is
+built from. It agrees with the whole-document estimate to 1e-6.
+
+**It never drafts a bullet.** Every line on the page is one you wrote.
+
+### Why the judge fans out, and why that is affordable
+
+Scoring started as one call: every shortlisted line against every requirement, one row of output per
+line. The judge has to hold a dozen rubrics at once, and has to emit sixty rows — so it drops some,
+invisibly, because a missing row and a zero are the same thing downstream.
+
+So `judge` is a LangGraph `Send` fan-out: one call per requirement, each asked only *which of these
+lines are evidence for this one thing*. Output is a handful of rows instead of sixty, and an empty
+list becomes a real answer rather than a malfunction.
+
+That should cost N times as much. It nearly doesn't:
+
+```
+system  ── rubric + every shortlisted CV line ──  identical in all N calls  → cached
+user    ── one requirement ──                     ~40 tokens, different each time
+```
+
+Every judge is handed the **whole** shortlist rather than the slice retrieved for its own
+requirement. That is what keeps the prefix byte-identical, and it is better anyway — a judge can find
+evidence BM25 ranked low for its requirement and high for someone else's. Anthropic caches that
+prefix where the `cache_control` breakpoint marks it; OpenAI caches long prefixes unprompted. The
+agent log prints the provider's own `cache_read` count, because otherwise this paragraph is a claim
+rather than a measurement. Concurrency is capped — N simultaneous requests is a rate limit on a fresh
+key and a stalled laptop on Ollama.
+
+The property the whole cost argument rests on — that every judge sends the same prefix — is invisible
+in the code. `lib/fanout.test.ts` asserts it directly.
+
+### It is measured, not asserted
+
+`lib/eval/` is an answer key: five postings' worth of requirements hand-labelled against a fixed
+fifteen-line CV. Each requirement carries the lines that genuinely **are** evidence, and **traps** —
+lines on the same topic that are not. Traps are the half that matters: a matcher that returns
+everything on the right topic scores perfectly on recall and is useless.
+
+Four metrics, micro-averaged over every labelled pair:
+
+| | what it asks |
+|---|---|
+| **shortlist** | did retrieval put the evidence in front of the judges at all — the ceiling on everything else |
+| **recall** | of the lines that are evidence, how many were credited |
+| **precision** | of the lines credited, how many the key agrees with |
+| **traps** | of the predicted over-claims, how many were made *(lower is better)* |
+
+Retrieval mode needs no key and takes a fifth of a second, so it runs in `npm test` on every commit.
+`npm run eval` prints it in full; `EVAL_MODEL=… npm run eval` runs the same key through a provider.
+
+```
+case               shortlist    recall   precis.     traps      gaps
+ml-inference            100%       56%       56%        0%      100%
+frontend                100%       67%      100%        0%      100%
+hardware                100%       75%       75%        0%      100%
+vocabulary-gap          100%        0%        —         0%        0%
+off-domain                —         —         —         —       100%
+total                   100%       55%       71%        0%       88%
+```
+
+**The first thing it did was overturn a constant.** The threshold deciding whether a line counts as
+evidence was 0.14 — but only after the harness existed. It had been 0.2, set because it looked about
+right against two postings tried by hand:
+
+```
+STRONG   recall   precision   traps   gap calls
+ 0.08      86%        51%       0%       100%
+ 0.10      77%        57%       0%       100%
+ 0.12      68%        60%       0%       100%
+ 0.14      55%        71%       0%        88%
+ 0.20      50%        69%       0%        82%      ← what it used to be
+```
+
+0.2 loses to 0.14 on **all four columns at once**. It was not a precision/recall trade; it was just
+too strict, and nothing before this could tell an improvement from a regression.
+
+Two other things the report says. **Retrieval is not the bottleneck** — every labelled line reaches
+the judges, which is the argument against reaching for embeddings over a corpus this size.
+And **`vocabulary-gap` scores zero and stays in the report**: it is the case where the posting and the
+CV describe the same work in different words, and the test asserts it *keeps* failing. Deleting it
+would raise the average and hide the one thing a model is actually for.
+
+### The trust boundary
+
+A job posting is pasted from a job board. Nobody reads all of it, and it goes straight into a prompt,
+which makes it the one genuinely untrusted input here. The prize for an attacker is not exfiltration
+— the model calls no tools and its whole output is `(line id, score)` pairs from a fixed corpus — it
+is **the scores**: talk a judge into crediting everything and the honest gap report becomes a lie.
+
+Postings are stripped of invisible characters and fenced with a per-run nonce, and anything that
+reads like an instruction is reported to *you* rather than quietly cleaned up. But the defences that
+actually hold are structural: a requirement is bounded to 120 characters and ten single-word terms
+before it can reach a judge, and a judge that calls more than half your CV direct evidence for one
+requirement is disbelieved and replaced with lexical scoring, which cannot be talked into anything.
+`lib/injection.test.ts` runs a hostile posting through the real graph against a model that obeys it
+completely — testing against one that resists would measure the model, not this code.
+
+### The rest
+
+- `lib/retrieve.ts` — BM25 with an alias pass over your own bullets. No embeddings: a few hundred
+  short documents written by one person is the size where lexical search wins outright, and your tag
+  vocabulary is hand-built supervision no embedding model has.
+- `lib/llm.ts` — Claude, ChatGPT, Ollama, or any OpenAI-compatible server, called straight from the
+  browser with your own key. Model lists are fetched from the provider rather than hardcoded.
+- **233 tests**, typecheck and build in CI.
+
+Longer version, including what is deliberately *not* built: **[docs/architecture.md](docs/architecture.md)**.
+
+---
+
 ## The problem
 
 Most job hunts end up with three or four résumé files that slowly drift apart. You fix a typo in one

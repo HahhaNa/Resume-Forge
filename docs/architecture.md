@@ -498,6 +498,7 @@ lib/
   eval/score.ts         counts in, micro-averaged rates out
   eval/run.ts           drives the real agent; retrieval mode in CI, model mode on demand
   llm.ts                provider config and the browser-side model client
+  untrusted.ts          the posting is not written by the user: scrub, fence, report
   import.ts             PDF / LaTeX résumé import
   ats.ts                job-board URL -> company, portal, role
   deepml.ts             Deep-ML catalogues: fetch, cache, search, link → ref
@@ -586,3 +587,41 @@ Read it as three findings:
 
 What the report does not yet cover: the `read` stage has no key of its own, and the model path is
 measured only when someone runs it.
+
+### The trust boundary
+
+A job posting is pasted from a job board. It is not written by the user, nobody reads all of it, and
+it goes straight into a prompt — the one genuinely untrusted input this app has.
+
+Worth being precise about the harm before designing against it. The model calls no tools, writes no
+files, and reaches no network of its own; its entire output is a requirement list and, per judge, a
+set of `(line id, score)` pairs drawn from a fixed corpus. So the prize is not exfiltration. It is
+**the scores**: a posting that talks a judge into returning every line as direct evidence produces a
+résumé claiming to answer requirements it does not, and the gap report — the one output nobody else
+gives you — becomes a lie.
+
+The chain that made this more than a nuisance ran through `read`. That stage is influenced by the
+posting by design, and its output goes to every judge at once. The regex fallback had always
+truncated a requirement to 120 characters; the model path had not, so a posting could ask for a
+five-thousand-character "requirement" and have it repeated verbatim into twelve prompts.
+
+Four layers, in increasing order of what they are worth:
+
+| | |
+|---|---|
+| `sanitise` | strips invisible and bidi characters — there is no legitimate reason for a bidi override in a job advert — and caps length |
+| `fence` | wraps untrusted text in a delimiter carrying a per-run nonce, with any copy of the nonce removed from the body, so the content cannot close its own block and speak in the prompt's voice |
+| **`bound`** | a requirement reaching a judge is at most 120 characters and ten single-word terms. Prompt hygiene makes an injection harder to land; this makes a landed one small — there is no room for a rubric, a role-play setup, or a scoring instruction with examples |
+| **credit cap** | a judge crediting more than half the shortlist for one requirement is disbelieved and that requirement is scored by retrieval instead. Behavioural, so it does not depend on having recognised the attack — and the fallback is lexical, the one scorer that cannot be talked into anything |
+
+The fence nonce is generated **once per run**, not per judge: it is inside the cached prompt prefix,
+and a nonce per call would be correct and would silently cost every cache hit. `injection.test.ts`
+asserts both — that the prefix survives fencing, and that the payload does not survive `bound`.
+
+Findings are reported to the user, never silently swallowed. The system has already refused to follow
+the text; only the person who pasted it can tell whether a posting that tries to give the model orders
+is a broken scraper or a reason not to apply, and they cannot tell if nobody mentions it.
+
+`injection.test.ts` runs a hostile posting through the real graph against a model that obeys it
+completely — repeating the payload into the requirement it emits, and crediting every line if the
+trigger reaches it. Testing against a model that resists injection measures the model, not this code.

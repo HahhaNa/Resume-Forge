@@ -25,10 +25,20 @@ import { estimatePages } from "@/lib/fit";
 import { resolve } from "@/lib/resume";
 import { loadSettings, ready, saveSettings, type LlmSettings } from "@/lib/llm";
 import { tailor, type Step, type TailorResult } from "@/lib/agent";
+import type { Finding } from "@/lib/untrusted";
 import { Bar, Field, Select, Stat, TagChips } from "@/components/ui/bits";
 import ModelSettings from "./ModelSettings";
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
+
+const ODD: Record<Finding["kind"], "oddHidden" | "oddOverride" | "oddRole" | "oddMarkup" | "oddScoring" | "oddLength"> = {
+  hidden: "oddHidden",
+  override: "oddOverride",
+  role: "oddRole",
+  markup: "oddMarkup",
+  scoring: "oddScoring",
+  length: "oddLength",
+};
 
 /** 6300 -> "6.3k" — token counts are for a sense of scale, not an invoice. */
 const short = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
@@ -215,6 +225,42 @@ export default function Tailor() {
           </div>
         )}
       </div>
+
+      {out && (out.guard.findings.length > 0 || out.guard.distrusted.length > 0) && (
+        /* Said out loud rather than handled quietly. The system already refused
+           to follow it, but only the user can tell whether a posting that tries
+           to give the model orders is a broken scraper or a reason not to
+           apply — and they cannot tell if nobody mentions it. */
+        <div className="card p-3.5" style={{ borderLeft: "2px solid var(--crit)" }}>
+          {out.guard.findings.length > 0 && (
+            <>
+              <h2 className="text-[13.5px] font-semibold leading-none" style={{ color: "var(--crit)" }}>
+                {t("postingOdd")}
+              </h2>
+              <ul className="mt-2 flex flex-col gap-0.5">
+                {out.guard.findings.map((f) => (
+                  <li key={`${f.kind}:${f.line}`} className="text-[12px] leading-[1.45]">
+                    · {t(ODD[f.kind])}
+                    {f.line > 0 && (
+                      <span className="mono ml-1.5 text-[10px]" style={{ color: "var(--faint)" }}>
+                        {t("atLine")} {f.line}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11.5px] leading-[1.5]" style={{ color: "var(--ink2)" }}>
+                {t("postingOddBody")}
+              </p>
+            </>
+          )}
+          {out.guard.distrusted.length > 0 && (
+            <p className="mt-2 text-[11.5px] leading-[1.5]" style={{ color: "var(--ink2)" }}>
+              {out.guard.distrusted.length} {t("judgeDistrusted")}
+            </p>
+          )}
+        </div>
+      )}
 
       {out && (
         <>

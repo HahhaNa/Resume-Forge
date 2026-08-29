@@ -111,7 +111,7 @@ describe("corpusPrompt", () => {
   ];
 
   it("offers every line it was given", () => {
-    const p = corpusPrompt(docs);
+    const p = corpusPrompt(docs, "n0");
     expect(p).toContain("b1\tWrote CUDA kernels");
     expect(p).toContain("b2\tBuilt a React app");
   });
@@ -119,31 +119,31 @@ describe("corpusPrompt", () => {
   /* the fan-out is only affordable because this half is byte-identical across
      every judge in a run — that is what the provider's cache keys on */
   it("does not vary with the requirement being judged", () => {
-    expect(corpusPrompt(docs)).toBe(corpusPrompt(docs));
-    expect(corpusPrompt(docs)).not.toContain("Requirement");
+    expect(corpusPrompt(docs, "n0")).toBe(corpusPrompt(docs, "n0"));
+    expect(corpusPrompt(docs, "n0")).not.toContain("Requirement");
   });
 
   it("says an empty answer is allowed, so a gap is reportable", () => {
-    expect(corpusPrompt(docs)).toMatch(/empty list is the\s+right answer/);
+    expect(corpusPrompt(docs, "n0")).toMatch(/empty list is the\s+right answer/);
   });
 
   /* the privacy boundary is structural — the prompt is built from this one
      argument — but a test says so out loud */
   it("carries the lines and not the entry they came from", () => {
-    expect(corpusPrompt(docs)).not.toContain("Acme");
+    expect(corpusPrompt(docs, "n0")).not.toContain("Acme");
   });
 });
 
 describe("requirementPrompt", () => {
   it("carries one requirement and marks whether it is stated or preferred", () => {
-    expect(requirementPrompt({ text: "CUDA kernels", kind: "must", keywords: ["cuda"] })).toContain(
+    expect(requirementPrompt({ text: "CUDA kernels", kind: "must", keywords: ["cuda"] }, "n0")).toContain(
       "stated requirement"
     );
-    expect(requirementPrompt({ text: "React", kind: "nice", keywords: [] })).toContain("preferred");
+    expect(requirementPrompt({ text: "React", kind: "nice", keywords: [] }, "n0")).toContain("preferred");
   });
 
   it("holds no CV text, so it is the only part that changes per judge", () => {
-    const p = requirementPrompt({ text: "CUDA kernels", kind: "must", keywords: ["cuda", "gpu"] });
+    const p = requirementPrompt({ text: "CUDA kernels", kind: "must", keywords: ["cuda", "gpu"] }, "n0");
     expect(p).toContain("cuda, gpu");
     expect(p).not.toContain("\t");
   });

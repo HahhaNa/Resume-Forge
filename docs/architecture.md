@@ -425,6 +425,109 @@ to break.
 concepts, and it converts the feature that already exists from something you have to know about into
 something the app insists on. Phase 2 is the one to be careful with — write the migration test first.
 
+### The next chapter
+
+Five things asked for after the Tailor tab landed. Written down here rather than in a tracker
+because four of the five have a trap in them that is not visible from the feature description, and
+the order below is chosen around those traps rather than around what sounds most exciting.
+
+#### 1. What the applications log already knows · *cheapest, do first*
+
+Run the gap analysis across **every** posting saved in the Applications tab, not one at a time, and
+aggregate: which requirements do you keep failing to answer, across all the roles you actually
+applied to? That answers two questions nothing else here can — *what should I build next*, and
+*which roles am I already a fit for* — and the machinery exists: `tailor()` already returns
+per-requirement gaps.
+
+**The blocker is a schema field.** `Application` carries `jdUrl` but not the posting's text, and the
+app cannot fetch it (CORS, and it would be the first thing that left the browser). So the posting has
+to be kept when it is pasted, which means a v3 field and a migration, and it means the Tailor tab
+should offer to attach a run to an application rather than being a dead end.
+
+Do this one first. It is the smallest change on the list and the only one that turns the two tabs
+that already exist into something neither is on its own.
+
+#### 2. Reading more résumé formats, and proving it · *foundation for §3*
+
+`lib/import.ts` already handles PDF, LaTeX, DOCX and Markdown, and `import.test.ts` covers the
+parsing helpers — but there are no fixture files in the repo, so nothing tests a real document end
+to end.
+
+The test worth writing first is not a fixture at all, it is a **round trip**:
+
+```
+db ──buildTex()──▶ .tex ──parseTex()──▶ Draft ──▶ compare to db
+```
+
+Every entry, bullet and skill that goes in must come back. That is a property test needing no
+fixtures, it catches the whole class of "the importer and the generator drifted apart", and — the
+reason it belongs before §3 — **a new template is only safe if it survives the round trip**. Add real
+fixtures after: a handful of anonymised résumés under `lib/fixtures/`, one per source (Overleaf
+template, Word export, Google Docs PDF, a two-column layout that should fail loudly rather than
+silently mangle).
+
+#### 3. More than one LaTeX layout · *has a trap*
+
+`buildTex()` writes one hardcoded preamble. Making it a template is mostly mechanical: lift the
+preamble, the section command and the entry/bullet renderers behind an interface, and let a variant
+name one.
+
+**The trap is `fit.ts`.** Page-fitting is not generic — it re-derives its geometry from the `DENSITY`
+table *that specific preamble* is built from, and `Preview.tsx` carries a `CAL` constant measured
+against compiled PDFs of *that* layout. A second template silently invalidates both, and the symptom
+is not a crash: it is a résumé the gauge calls 0.94 pages that prints on two. `pack.ts` sits on top
+of `fit.ts`, so the packer goes wrong with it.
+
+So a template is not a `.tex` string. It is a `.tex` string **plus its own metrics plus its own CAL,
+measured the way the comment in `Preview.tsx` describes** — from compiled PDFs, across three
+densities and three font sizes. Budget for that measurement, and do not ship a template without it.
+
+#### 4. Rewriting bullets · *needs a decision before any code*
+
+This one contradicts something the project currently promises, in the README, in the guide, in
+`agent.ts`, and in the commit that introduced it:
+
+> It never drafts a bullet. Every line on the page is one you wrote, because a résumé that says
+> something you did not do is a worse outcome than a résumé with a gap in it.
+
+That is a real position, not an accident, and rewriting is a genuinely useful feature. Both can be
+true — but the promise has to be *changed deliberately and visibly*, not quietly weakened. What that
+costs, concretely:
+
+- **Provenance on the bullet.** A `Bullet` needs to record that its text was model-drafted and
+  human-approved, the preview needs to say so, and the claim in the docs becomes "every line is one
+  you approved" — which is weaker, and true.
+- **A diff, never an in-place edit.** A rewrite is a proposal shown against the original, applied by
+  a click, undoable. The original text is kept.
+- **A different eval.** `lib/eval/` measures *selection*: did it pick the right lines. Rewriting
+  introduces a failure mode selection cannot have — a rewrite that reads better and says something
+  that is not true. That needs its own answer key, checking factual fidelity against the source
+  bullet, and the current harness cannot be extended to it without a new labelling scheme.
+
+Until the third of those exists, a rewrite feature is shipping the exact failure the project was
+built to avoid.
+
+#### 5. A Chrome extension that fills in application forms · *separate codebase*
+
+The largest of the five and the only one that is not this repo: an MV3 extension is its own build,
+its own manifest, its own review process, and probably its own repository.
+
+What already helps: `lib/ats.ts` recognises the portals — Greenhouse, Lever, Ashby, Workday, iCIMS
+and the rest — so the extension knows what it is looking at from the URL alone.
+
+The design question to settle first is **how the data crosses**. The résumé lives in `localStorage`
+on the app's own origin, which an extension cannot read from a job board's page. The options are a
+content script on the app's origin, an explicit export the extension imports, or the app pushing to
+`chrome.storage` through `externally_connectable`. They differ in how much of the "your data never
+leaves your machine" story survives, so pick on that basis rather than on convenience.
+
+Two things to hold on to: autofill must **show what it is about to enter and require a click** — a
+tool that silently types your phone number into a form you have not read is not a convenience — and
+a job board's page is untrusted input in exactly the sense `untrusted.ts` describes, so anything read
+off the DOM and put in front of a model gets the same treatment.
+
+---
+
 ### For the project's reach
 
 Phase 0 is also the growth work, which is not a coincidence. The thing that makes a repo spread is a

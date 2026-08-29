@@ -5,6 +5,7 @@ the handful of rules that aren't obvious from looking at the screen.
 
 - [Resume](#resume)
 - [Library](#library)
+- [Tailor](#tailor)
 - [Applications](#applications)
 - [Practice](#practice)
 - [Data](#data)
@@ -99,6 +100,70 @@ dropped.
 
 The same variant checkboxes are on the ✎ entry editor, so a new entry can be pushed to every résumé
 without leaving the Resume tab.
+
+---
+
+## Tailor
+
+Paste a job description. You get back a proposal for a one-page résumé aimed at it, plus the working
+behind that proposal.
+
+What happens, in order: the posting is turned into a list of the capabilities it asks for; your
+bullet library is searched for lines that answer each one; the lines are scored; and then the page is
+filled with the best of them, stopping at exactly one page. If a required capability ends up with
+nothing on the page answering it, the posting is searched again with different words before it gives
+up and reports the gap.
+
+**The gap list is the part worth reading.** Everything else is a résumé you could have assembled by
+hand with enough patience. "Nothing in your library answers this" is the thing you cannot see by
+looking at your own CV, and it is better to find out now than in the interview.
+
+**Nothing is written until you press `Create variant`.** Up to then this is a suggestion. What you
+get is an ordinary variant — same as one you built by hand, editable on the Resume tab, deletable,
+undoable. Only the typography, margins and header row are inherited from the variant you started
+from; the section list and the ticks are the ones just computed.
+
+**It never writes a bullet for you.** Every line it puts on the page is one you wrote. It selects; it
+does not draft. A résumé that claims something you did not do is a worse outcome than a résumé with a
+gap in it.
+
+### With and without a model
+
+The tab works with nothing connected. It matches on keywords, and it is honest about it: the banner
+says so, and the scoring is stricter about what counts as an answer, because a word in common is not
+evidence.
+
+Connecting a model changes the two steps that need judgement rather than lookup — reading the posting,
+and deciding whether a line really answers a requirement. The second of those runs as one call per
+requirement, in parallel, so each judge has a single thing to weigh; the agent log shows how many
+calls that took and how much of the input the provider served from its cache. Four options:
+
+| | Where it runs | Key |
+|---|---|---|
+| **Claude** | Anthropic | Yours |
+| **ChatGPT** | OpenAI | Yours |
+| **Ollama** | Your own machine | None |
+| **OpenAI-compatible** | Wherever you point it — vLLM, LM Studio, llama.cpp, Together, Groq, OpenRouter | Depends |
+
+The model list is fetched from the provider rather than typed, so it cannot go stale. `Test` saves
+and tries the connection in one step — a key that was saved but never tried is a setting that looks
+finished and fails halfway through a run.
+
+**What is sent, when a model is connected:** the posting you pasted, and the résumé lines the search
+shortlisted. That is all. Not your applications, not your notes, not who referred you, not your
+contact details. The panel says the same thing on screen before you run anything.
+
+**Where your key is kept:** its own corner of browser storage, deliberately *not* part of your résumé
+database — so it is never inside an export, a backup file, or a restore point. `Forget key` removes
+it. Pick Ollama and nothing leaves your machine at all.
+
+### When the page does not fill
+
+The percentage is measured the same way the Resume tab's page counter is, so `88%` here means the
+same thing there. If it comes back low, the library did not have enough that scored well enough —
+either the posting is far from your experience, or the bullets that would answer it are worded in
+vocabulary the search does not connect. Adding a tag to those bullets and putting it in `Focus tags`
+is the quickest fix. So is connecting a model.
 
 ---
 

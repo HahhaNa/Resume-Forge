@@ -53,6 +53,8 @@ flowchart LR
   F -.->|read on launch| BK
   UI -->|only on 'Sync catalogue'| PX[/api/deepml]
   PX --> DM[(Deep-ML public API)]
+  UI -->|only if a model is connected| LM[lib/agent.ts]
+  LM -.->|posting + shortlisted bullets<br/>user's own key, no proxy| PR[(Claude / OpenAI / Ollama)]
 ```
 
 | Piece | Where | Notes |
@@ -63,6 +65,8 @@ flowchart LR
 | Sync | The file, in a cloud-synced folder | Desktop ↔ desktop only |
 | Conflict | Halt and ask | Never merges, never guesses |
 | Server | `app/api/deepml/route.ts` | 60 lines, read-only, no state, no key |
+| Tailoring | `lib/agent.ts` → `retrieve.ts` + `pack.ts` | Off by default; keyword-only without a model; the key lives outside `DB` |
+| Model calls | Browser → provider, direct | User's own key and account. No route of ours is in the path |
 
 That is the whole system. It is genuinely small, and the small size is worth defending.
 
@@ -444,8 +448,17 @@ a short GIF of ticking bullets and watching the page counter go blue, repo topic
 - **No CRDT.** See §3.
 - **No React Native / native app.** An installed PWA covers the mobile cases above; a second codebase
   does not pay for itself.
-- **No telemetry.** Not even anonymous. It would be the first thing that leaves the browser, and the
-  README's promise that nothing does is worth more than the numbers.
+- **No telemetry.** Not even anonymous. It is still the case that nothing about how you use this app
+  is ever reported to us, and that is worth more than the numbers.
+- **A model may be called; it is never ours, and never required.** The Tailor tab sends the posting
+  you pasted and the shortlisted lines of your own CV to a provider *you* configured, with *your*
+  key, straight from the browser — there is no proxy of ours in the path, so there is no point at
+  which we could hold either. It is off until switched on, it degrades to keyword matching when it
+  is off, and Ollama makes the whole feature local. The key lives outside the database precisely so
+  that exports, backup files and restore points cannot carry it.
+- **The model ranks; it never packs, and never writes.** Fitting a page is arithmetic against
+  `fit.ts` (`pack.ts` explains why), and every bullet on a tailored résumé is one the user wrote. A
+  tool that invents experience is a worse tool, not a more capable one.
 
 ---
 
@@ -455,6 +468,7 @@ a short GIF of ticking bullets and watching the page counter go blue, repo topic
 app/
   page.tsx              resume builder
   library/page.tsx      entry × variant matrix
+  tailor/page.tsx       posting -> one tailored page
   applications/page.tsx application tracker
   practice/page.tsx     multi-platform practice tracker
   data/page.tsx         profile, tags, backup file, import/export
@@ -464,6 +478,8 @@ components/
   resume/Preview.tsx    page-accurate live preview
   resume/EntryModal.tsx entry fields + which variants carry it
   resume/CompareVariants.tsx  variant diff
+  tailor/Tailor.tsx     paste a posting, read the working, keep the result
+  tailor/ModelSettings.tsx  provider, key, model — and what leaves the browser
   ui/bits.tsx           shared inputs, bars, modal
 lib/
   *.test.ts             vitest, node environment — the pure modules below
@@ -473,9 +489,58 @@ lib/
   store.ts              zustand store, persisted
   backup.ts             continuous write to a user-picked file; handle in IndexedDB
   resume.ts             resolve(db, variant) -> LaTeX and preview
+  fit.ts                Preview's geometry as arithmetic — how tall, without a DOM
+  pack.ts               scores + fit.ts -> exactly one page (knapsack with setup costs)
+  retrieve.ts           BM25 over your own bullets; no embeddings, no key, works offline
+  agent.ts              the LangGraph loop: read, recall, judge (fan-out), fit, critique
+  llm.ts                provider config and the browser-side model client
   import.ts             PDF / LaTeX résumé import
   ats.ts                job-board URL -> company, portal, role
   deepml.ts             Deep-ML catalogues: fetch, cache, search, link → ref
   seed.ts               starter content
   i18n.ts               EN / ZH strings
 ```
+
+### How tailoring is split
+
+The division of labour is the design, so it is worth stating once:
+
+| Step | Who does it | Why |
+|---|---|---|
+| Read the posting | model, with a regex fallback | Turning prose into a requirement list is what a model is for; the fallback is what makes the tab work before a key exists |
+| Find candidate lines | `retrieve.ts`, BM25 + aliases | A few hundred short documents written by one person. Embeddings would add a provider, a key, a vector store and a round trip to lose on exact terms like `CUDA` or `Verilog` |
+| Score them | model, **one judge per requirement, in parallel** | The only genuinely hard judgement: does this line answer that requirement. See below for why it fans out |
+| Fill the page | `pack.ts` + `fit.ts` | A model cannot see a line break. Ask one to "fit one page" and it agrees, confidently, at 1.3 pages |
+| Report the gaps | `agent.ts` | The output nobody else gives you, and the reason the loop exists |
+
+### Why the judge fans out
+
+Scoring started as one call: every shortlisted line against every requirement, one row of output
+per line. Two things are wrong with that. The judge has to hold a dozen rubrics at once, which makes
+it worse at each of them; and it has to emit sixty rows, which means it drops some — invisibly,
+because a missing row and a zero are the same thing downstream.
+
+So `judge` is a `Send` fan-out: one call per requirement, each asked only *which of these lines are
+evidence for this one thing*. The output is a handful of rows instead of sixty, an empty list is a
+real answer rather than a malfunction, and each judge has one rubric to apply.
+
+That should cost twelve times as much, and it nearly doesn't:
+
+```
+system  ── rubric + every shortlisted CV line ──  identical in all 12 calls  → cached
+user    ── one requirement ──                     ~40 tokens, different each time
+```
+
+Every judge gets the *whole* shortlist, not the slice retrieved for its own requirement. That is
+what keeps the prefix byte-identical, and it is better anyway — a judge can find evidence BM25
+ranked low for its requirement and high for someone else's. Anthropic caches that prefix where the
+`cache_control` breakpoint marks it; OpenAI caches long prefixes unprompted; Ollama has its own KV
+cache. So the run costs one corpus plus twelve short questions.
+
+`usage` carries `cache_read` back from the provider and the agent log prints it, because otherwise
+the paragraph above is a claim rather than a measurement. Concurrency is capped (4 by default):
+twelve simultaneous requests is a rate limit on a fresh API key and a stalled laptop on Ollama.
+
+The property all of this rests on — that every judge in a run sends the same prefix — is invisible
+in the code and holds only because `fanOut` hands each task the same shortlist. `fanout.test.ts`
+asserts it directly, with a stand-in model.

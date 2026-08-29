@@ -41,6 +41,7 @@ const STALE_DAYS = 7;
 const TABS = [
   { href: "/", key: "nav_resume" as const },
   { href: "/library", key: "nav_library" as const },
+  { href: "/tailor", key: "nav_tailor" as const },
   { href: "/applications", key: "nav_apps" as const },
   { href: "/practice", key: "nav_practice" as const },
   { href: "/data", key: "nav_data" as const },

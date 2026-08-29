@@ -26,6 +26,7 @@ import type {
   SkillGroup,
   UndoStep,
   Variant,
+  VariantSection,
 } from "./types";
 import { MAX_RESTORE_POINTS, MAX_UNDO, REVIEW_INTERVALS, UNDO_COALESCE_MS } from "./types";
 
@@ -77,6 +78,15 @@ interface Store extends UI {
   removeSkill: (id: string) => void;
 
   addVariant: (cloneFrom?: string) => string;
+  addTailoredVariant: (v: {
+    name: string;
+    label: string;
+    note: string;
+    sections: VariantSection[];
+    bulletIds: string[];
+    /** typography and header are inherited from this variant, never invented */
+    from?: string;
+  }) => string;
   patchVariant: (id: string, v: Partial<Variant>) => void;
   removeVariant: (id: string) => void;
   toggleBulletInVariant: (variantId: string, bulletId: string) => void;
@@ -433,6 +443,41 @@ export const useStore = create<Store>()(
         };
         set(
           step("Variant added", (s) => ({
+            db: { ...s.db, variants: [...s.db.variants, v] },
+            activeVariantId: id,
+          }))
+        );
+        return id;
+      },
+
+      /**
+       * A variant whose selection was computed rather than clicked. It is a
+       * plain variant from here on — editable, deletable, undoable — because a
+       * tailored résumé the user cannot then argue with is not much use, and
+       * because nothing downstream should have to know where a selection came
+       * from. Only the typography and the header follow the variant it was
+       * derived from; the sections and ticks are the packer's.
+       */
+      addTailoredVariant: ({ name, label, note, sections, bulletIds, from }) => {
+        const id = uid("v");
+        const src = get().db.variants.find((v) => v.id === from) ?? get().db.variants[0];
+        const v: Variant = {
+          id,
+          name,
+          label,
+          note,
+          sections,
+          bulletIds,
+          header: src?.header ?? { phone: true, linkedin: true, github: true, site: false },
+          contact: src?.contact,
+          linkStyle: src?.linkStyle,
+          density: src?.density ?? "tight",
+          fontSize: src?.fontSize ?? 10,
+          pageTarget: src?.pageTarget ?? 1,
+          updatedAt: stamp(),
+        };
+        set(
+          step("Tailored variant added", (s) => ({
             db: { ...s.db, variants: [...s.db.variants, v] },
             activeVariantId: id,
           }))

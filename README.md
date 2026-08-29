@@ -6,7 +6,7 @@
 
 [**▸ Open Resume Forge**](https://resume-forge-blond.vercel.app) · [User guide](docs/guide.md) · [How it's built](docs/architecture.md)
 
-Free · open source · no sign-up · nothing is uploaded anywhere
+Free · open source · no sign-up · nothing leaves your browser unless you connect your own AI model
 
 </div>
 
@@ -51,6 +51,16 @@ what that company received.
 **A practice tracker.** LeetCode, NeetCode, Deep-ML, HDLBits, or anything else you add. It
 cross-references what you've practised against the topics on the jobs you've actually applied to,
 so you can see what you're weakest on where it counts.
+
+**One page, tailored to one posting.** Paste a job description on the Tailor tab. It reads what the
+role asks for, searches your bullet library for the lines that answer it, and fills exactly one page
+with them — then shows its working: which of your bullets answers which requirement, and which
+requirements **nothing** in your library answers. That last list is the useful one. It never writes
+a bullet for you; every line on the page is one you wrote.
+
+This works with no setup at all, matching on keywords. Connect a model — Claude, ChatGPT, or an open
+model running on your own machine through Ollama — and it matches on meaning instead. Your key, your
+account, straight from your browser; see the FAQ for exactly what gets sent.
 
 **Your data stays yours.** Everything lives on your own computer. No account, no server, no company
 holding your job hunt. Export the whole thing as one file whenever you like.
@@ -137,9 +147,17 @@ written up in [docs/architecture.md](docs/architecture.md).
 **Do I need to know LaTeX?** No. You never see it unless you go looking. Press `Open in Overleaf`
 and you get a PDF.
 
-**Is my résumé uploaded anywhere?** No. Nothing you type leaves your browser. The app only ever
-makes one outbound request, and only if you press `Sync catalogue` on the Practice tab — that fetches
-Deep-ML's public list of exercises, and sends nothing about you.
+**Is my résumé uploaded anywhere?** Not unless you ask for it. By default the app makes one outbound
+request in its whole life, and only if you press `Sync catalogue` on the Practice tab — that fetches
+Deep-ML's public list of exercises and sends nothing about you.
+
+The one exception is the Tailor tab, and only after you have connected a model and switched it on.
+Then two things are sent to the provider *you* chose, with *your* key, straight from your browser:
+the job description you pasted, and the résumé lines the search shortlisted. Never your applications,
+your notes, who referred you, or your contact details. Your key is kept apart from your résumé data,
+so it is not in any export, backup file or restore point. Pick Ollama instead and nothing leaves your
+machine at all. Leave the tab alone and it behaves exactly as it did before: keyword matching, no
+network.
 
 **Can I share the link with a friend?** Yes, and that's safe. They get their own empty copy in their
 own browser. They cannot see anything of yours.
@@ -221,8 +239,10 @@ npx vercel --prod
 
 ## How it's built
 
-Next.js 15 (App Router) · TypeScript · Tailwind · Zustand. About 11k lines. The only server-side file
-in the whole repo is a 60-line read-only proxy for Deep-ML's public catalogue.
+Next.js 15 (App Router) · TypeScript · Tailwind · Zustand · LangChain + LangGraph for the tailoring
+agent. About 13k lines. The only server-side file in the whole repo is a 60-line read-only proxy for
+Deep-ML's public catalogue — the model clients run in your browser, which is why there is still
+nowhere for us to hold a key or read a résumé.
 
 - **[docs/guide.md](docs/guide.md)** — what every tab does, in detail. Read this if you're using the app seriously.
 - **[docs/architecture.md](docs/architecture.md)** — the data model, why there's no backend, and the plan for mobile and sync.

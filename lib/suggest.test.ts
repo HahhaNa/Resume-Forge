@@ -77,12 +77,15 @@ describe("payoff", () => {
       id: "t1",
       hits: [hit({ appId: "a1", answer: "page" }), hit({ appId: "a2", answer: "library" }), hit({ appId: "a3" })],
     });
-    expect(payoff([t])).toEqual({ postings: 1, musts: 1 });
+    expect(payoff([t]).postings).toBe(1);
+    expect(payoff([t]).musts).toBe(1);
+    expect(payoff([t]).helps.map((a) => a.appId)).toEqual(["a3"]);
   });
 
   it("separates required from preferred", () => {
     const t = theme({ id: "t1", hits: [hit({ appId: "a1" }), hit({ appId: "a2", kind: "nice" })] });
-    expect(payoff([t])).toEqual({ postings: 2, musts: 1 });
+    expect(payoff([t]).postings).toBe(2);
+    expect(payoff([t]).musts).toBe(1);
   });
 });
 
@@ -97,6 +100,12 @@ describe("ground", () => {
     const [s] = ground([idea(["t-cuda"])], themes);
     expect(s.postings).toBe(2);
     expect(s.musts).toBe(2);
+  });
+
+  /* a count nobody can trace is a count nobody trusts */
+  it("names the applications behind the number", () => {
+    const [s] = ground([idea(["t-cuda"])], themes);
+    expect(s.helps.map((a) => a.appId)).toEqual(["a1", "a2"]);
   });
 
   /* a project justified by a requirement nobody asked for is fiction */

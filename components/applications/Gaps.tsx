@@ -393,6 +393,11 @@ export default function Gaps() {
                   <p className="mt-1 text-[10.5px] leading-[1.4]" style={{ color: "var(--faint)" }}>
                     {t("buildCloses")}: {idea.themes.map((th) => th.label).join(" · ")}
                   </p>
+                  {/* the count above, spelled out. A number nobody can trace back
+                      to a row on this page is a number nobody should trust */}
+                  <p className="mt-0.5 text-[10.5px] leading-[1.4]" style={{ color: "var(--faint)" }}>
+                    {idea.helps.map((a) => a.company || a.role || "—").join(" · ")}
+                  </p>
                 </li>
               ))}
             </ul>

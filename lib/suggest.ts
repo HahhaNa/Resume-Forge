@@ -48,6 +48,8 @@ export interface Suggestion extends Idea {
   postings: number;
   /** of those asks, how many the posting called required */
   musts: number;
+  /** which ones, by name — a count nobody can trace is a count nobody trusts */
+  helps: { appId: string; company: string; role: string }[];
 }
 
 /**
@@ -83,16 +85,16 @@ export function worthBuilding(themes: Theme[]): Theme[] {
  * `none` hits count: a theme your library already answers is not a reason to
  * build anything, whatever the model thought.
  */
-export function payoff(themes: Theme[]): { postings: number; musts: number } {
-  const apps = new Set<string>();
+export function payoff(themes: Theme[]): Pick<Suggestion, "postings" | "musts" | "helps"> {
+  const apps = new Map<string, { appId: string; company: string; role: string }>();
   let musts = 0;
   for (const t of themes)
     for (const h of t.hits) {
       if (h.answer !== "none") continue;
-      apps.add(h.appId);
+      if (!apps.has(h.appId)) apps.set(h.appId, { appId: h.appId, company: h.company, role: h.role });
       if (h.kind === "must") musts++;
     }
-  return { postings: apps.size, musts };
+  return { postings: apps.size, musts, helps: [...apps.values()] };
 }
 
 /**

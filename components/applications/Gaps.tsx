@@ -32,6 +32,8 @@ import { useT } from "@/lib/i18n";
 import { loadSettings, ready, type LlmSettings } from "@/lib/llm";
 import { addUsage, tailor, NO_USAGE, type Usage } from "@/lib/agent";
 import { aggregate, summarise, type PostingRun } from "@/lib/gaps";
+import { suggest, worthBuilding, type Suggestion } from "@/lib/suggest";
+import { chatModel } from "@/lib/llm";
 import { Bar, Stat } from "@/components/ui/bits";
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -59,6 +61,8 @@ export default function Gaps() {
   const [odd, setOdd] = useState(0);
   const [offline, setOffline] = useState(false);
   const [usage, setUsage] = useState<Usage>(NO_USAGE);
+  const [ideas, setIdeas] = useState<Suggestion[]>([]);
+  const [thinking, setThinking] = useState(false);
   /* a ref, not state: the loop has to see the change on its next turn, and a
      re-render is not what stops it */
   const halt = useRef(false);
@@ -67,13 +71,33 @@ export default function Gaps() {
   const missing = db.applications.length - kept.length;
   const agg = useMemo(() => aggregate(runs), [runs]);
   const acted = agg.themes.filter((th) => th.missing > 0 || th.inLibrary > 0);
+  const buildable = useMemo(() => worthBuilding(agg.themes), [agg.themes]);
   const answered = agg.themes.length - acted.length;
+
+  /* asked for rather than rendered, like the read above it: this is another
+     model call, and the gap list it builds on is already the useful output */
+  const propose = async () => {
+    if (!buildable.length || !ready(settings)) return;
+    setThinking(true);
+    setError("");
+    try {
+      const model = await chatModel(settings);
+      const { suggestions, usage: u } = await suggest({ themes: agg.themes, db, model, kind: settings.kind });
+      setIdeas(suggestions);
+      setUsage((prev) => addUsage(prev, u));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setThinking(false);
+    }
+  };
 
   const read = async () => {
     if (!kept.length) return;
     setBusy(true);
     setError("");
     setRuns([]);
+    setIdeas([]);
     setOdd(0);
     setOffline(false);
     setUsage(NO_USAGE);
@@ -323,6 +347,55 @@ export default function Gaps() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* The gap list says what you keep failing. This says what to do about
+              it — and the number beside each project is counted from the hits
+              already on this page, not asked of the model, because "this would
+              unlock 6 applications" is exactly the kind of confident figure that
+              is wrong and unfalsifiable. */}
+          <div className="card p-3.5">
+            <div className="mb-2 flex items-center gap-2.5">
+              <h2 className="text-[13.5px] font-semibold leading-none">{t("buildNext")}</h2>
+              <span className="rule" />
+              {ready(settings) ? (
+                <button
+                  className="btn btn-sm shrink-0"
+                  onClick={propose}
+                  disabled={thinking || !buildable.length}
+                >
+                  {thinking ? t("buildThinking") : t("buildAsk")}
+                </button>
+              ) : (
+                <span className="text-[11px] shrink-0" style={{ color: "var(--faint)" }}>
+                  {t("buildNeedsModel")}
+                </span>
+              )}
+            </div>
+            <p className="mb-3 text-[11.5px] leading-[1.5]" style={{ color: "var(--ink2)" }}>
+              {buildable.length ? t("buildNextHint") : t("buildNothing")}
+            </p>
+
+            <ul className="flex flex-col gap-2.5">
+              {ideas.map((idea) => (
+                <li key={idea.title} className="border-l-2 pl-2.5" style={{ borderColor: "var(--accent)" }}>
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-[12.5px] font-semibold">{idea.title}</span>
+                    <span className="mono tabnum text-[10px]" style={{ color: "var(--accent-ink)" }}>
+                      {idea.postings} {t("buildPayoff")}
+                      {idea.musts > 0 && ` · ${idea.musts} ${t("buildRequired")}`}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[12px] leading-[1.45]">{idea.what}</p>
+                  <p className="mt-0.5 text-[11.5px] leading-[1.45]" style={{ color: "var(--ink2)" }}>
+                    {idea.why}
+                  </p>
+                  <p className="mt-1 text-[10.5px] leading-[1.4]" style={{ color: "var(--faint)" }}>
+                    {t("buildCloses")}: {idea.themes.map((th) => th.label).join(" · ")}
+                  </p>
+                </li>
+              ))}
+            </ul>
           </div>
         </>
       )}

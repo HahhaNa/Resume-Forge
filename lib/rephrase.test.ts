@@ -43,6 +43,20 @@ describe("facts", () => {
     expect(facts("Designed a scheduler")).not.toContain("designed");
   });
 
+  /* the claims English writes in plain lowercase — invisible to a rule about
+     capital letters, and the ones that actually get caught in a room */
+  it("takes a claim of magnitude, primacy or seniority", () => {
+    expect(facts("Doubled throughput")).toContain("doubled");
+    expect(facts("Built the first parser")).toContain("first");
+    expect(facts("Owned the pipeline")).toContain("owned");
+  });
+
+  /* a guard that refuses every rewrite is one nobody leaves switched on */
+  it("leaves ordinary verbs alone", () => {
+    for (const w of ["designed", "built", "wrote", "shipped", "optimised"])
+      expect(facts(`Something ${w} here`)).not.toContain(w);
+  });
+
   it("ignores bold markers", () => {
     expect(facts("Cut latency **40%**")).toEqual(facts("Cut latency 40%"));
   });
@@ -110,6 +124,23 @@ describe("check", () => {
     const c = check(orig, "Reduced inference latency 40% on a 7B model using CUDA graphs and TensorRT");
     expect(c.ok).toBe(false);
     expect(c.invented).toContain("tensorrt");
+  });
+
+  it("refuses inflation written in words", () => {
+    expect(check("Improved throughput", "Doubled throughput").invented).toContain("doubled");
+    expect(check("Contributed to a rewrite", "Led a rewrite").invented).toContain("led");
+    expect(check("Worked on the pipeline", "Owned the pipeline").invented).toContain("owned");
+  });
+
+  it("allows a claim the original already made", () => {
+    expect(check("Led a team building an agent", "Led the team that built an agent").ok).toBe(true);
+  });
+
+  /* a tag saying `ml` cannot make you the person who led the team */
+  it("never lets context license a claim of seniority", () => {
+    const c = check("Worked on inference", "Led inference work", ["Team Lead", "ml", "led"]);
+    expect(c.ok).toBe(false);
+    expect(c.invented).toContain("led");
   });
 
   it("refuses a number that grew", () => {

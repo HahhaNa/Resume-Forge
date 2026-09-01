@@ -123,9 +123,34 @@ get is an ordinary variant — same as one you built by hand, editable on the Re
 undoable. Only the typography, margins and header row are inherited from the variant you started
 from; the section list and the ticks are the ones just computed.
 
-**It never writes a bullet for you.** Every line it puts on the page is one you wrote. It selects; it
-does not draft. A résumé that claims something you did not do is a worse outcome than a résumé with a
-gap in it.
+**It never invents a claim.** It selects; it does not draft. A résumé that says something you did not
+do is a worse outcome than a résumé with a gap in it.
+
+### Rewording a line for the posting
+
+Next to each line on the page there is a `Reword` button, once a model is connected. It rewrites that
+one sentence in the posting's vocabulary — "cut decode latency" for a posting that says "LLM
+inference optimisation" — and shows the result under the original for you to accept or ignore.
+
+**The facts cannot move, only the words.** Before a rewrite is offered it is checked against the
+original, and refused outright if it introduces:
+
+- **a number** the original did not have — 40%, 7B, p99, three weeks. These come from the original
+  line or nowhere. No amount of surrounding context makes up a figure nobody measured.
+- **a claim of magnitude, primacy or seniority** — `doubled`, `eliminated`, `first`, `sole`, `led`,
+  `owned`, `architected`. These are the ones that get caught in an interview, and they are as
+  protected as numbers: an entry tagged `ml` does not make you the person who led the team.
+- **a tool, language or company name** that neither the line nor its entry mentions. A name *may*
+  come from the entry's own org, title or tags — a bullet under *ML Systems Intern* tagged `llm` is
+  about LLM work whether or not it uses the letters — but **never from the posting**. An advert
+  asking for TensorRT is not permission to put TensorRT on your résumé.
+
+A refused rewrite is still shown, with what it tried to add. There is no "accept anyway": the Resume
+tab already lets you edit any bullet by hand, and a sentence you typed yourself is one you have read.
+
+**A rewording belongs to the résumé, not to the library.** The original bullet is untouched and every
+other variant goes on saying what it said. The page counter reads the new wording, so a rewrite two
+words longer shows up as a fuller page rather than a surprise at the bottom of the second one.
 
 **Keep the posting.** Under the results there is a box that files the posting under an application —
 an existing row, or a new one it fills in from the link. Worth doing every time, for two reasons: the
@@ -222,6 +247,21 @@ for free, and says so — the folding is weaker that way, because the requiremen
 are whole sentences lifted out of the advert rather than short capabilities.
 
 ---
+
+### What to build next
+
+Under the gap list there is a `Suggest projects` button. It reads the gaps nothing of yours answers
+and proposes three to five projects — each one finishable by one person in a few weeks, and chosen to
+close several gaps at once rather than one gap well.
+
+**The model proposes; the arithmetic is done here.** Beside each project is something like
+`3 applications · 2 required`, followed by the company names. That count is not the model's estimate.
+It is counted from the postings on this screen — the ones that asked for those gaps and had nothing
+of yours answering them — and every name in it is a row you can scroll up and find. A project the
+model justified with a requirement nobody actually asked for is dropped rather than shown.
+
+It suggests things adjacent to what you already do, on the grounds that a project starting from what
+you know is one you finish and a project starting from nothing is a new year's resolution.
 
 ## Practice
 

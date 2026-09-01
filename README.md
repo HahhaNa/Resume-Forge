@@ -32,12 +32,15 @@ of tick-boxes over that library.
 | **Real LaTeX output** | The app writes LaTeX and hands you a `.tex` or an [Overleaf](https://www.overleaf.com) link. You never have to read it. |
 | **A page counter that doesn't lie** | The live preview is measured against real LaTeX geometry, so `0.94 / 1` genuinely fits and `1.03 / 1` genuinely spills. |
 | **Tailored to one posting** | Paste a job description. It fills exactly one page with the lines of your own history that answer it — and lists the requirements **nothing** of yours answers. |
-| **Gaps across every posting** | Ask that same question of all the roles you have applied to at once: what you keep failing to answer, and so what to go and build. |
+| **Reworded, never invented** | A line can be reworded to speak the posting's language. A guard refuses any rewrite that adds a number, tool or name the original did not have, so the wording moves and the claim does not. |
+| **Gaps across every posting** | Ask that same question of every role you have applied to at once: what you keep failing to answer — and which projects would close the most of it, counted against the applications each would have helped. |
 | **Application tracker** | Paste a job link; company, role and ATS are read from the URL. Each row freezes the résumé you actually sent. |
 | **Practice tracker** | LeetCode, NeetCode, Deep-ML, HDLBits. Cross-referenced against the topics on the jobs you applied to. |
 | **Your data stays yours** | No account, no server, no database. Everything lives in your browser, exportable as one file. |
 
-It **never drafts a bullet.** Every line on the page is one you wrote.
+It **never invents a claim.** Every fact on the page is one you wrote. A bullet can be reworded to
+match a posting's vocabulary, but nothing is applied until you accept it, and a rewrite that smuggles
+in a number or a tool the original did not have is refused rather than offered.
 
 Tailoring works with no setup at all, matching on keywords. Connect a model — Claude, ChatGPT, or an
 open model on your own machine via Ollama — and it matches on meaning instead.
@@ -79,6 +82,19 @@ Seven nodes, one loop, built on LangGraph. Four things about it are worth a line
   confidently, at 1.3 pages — nothing in a prompt can see a line break. `fit` is a knapsack with
   setup costs, against geometry re-derived from the same table the LaTeX preamble is built from. It
   agrees with the whole-document estimate to 1e-6.
+
+- **Where it writes, the writing is checked.** Two things here generate rather than select —
+  rewording a line, and proposing a project to close your gaps — and both are split the same way:
+  the model produces the prose, and the part that would be confidently wrong is computed in code
+  instead. A rewrite's checkable facts must be a subset of what licenses them; a number has to come
+  from the original line, while a tool or a name may also come from that entry's own org, title and
+  tags. The posting is never a licence — an advert saying TensorRT must not be what puts TensorRT on
+  your résumé. Likewise a suggested project names which gaps it closes, and *how much that is worth*
+  is counted from your own applications rather than asserted: "3 applications · 2 required", every
+  name traceable to a row on the same screen. `lib/rephrase.test.ts` tests the guard against a model
+  that embellishes, which is the realistic failure rather than the adversarial one — though a *test*
+  is not the *eval* that `lib/eval/` is for the matcher, and
+  [docs/architecture.md](docs/architecture.md) says so rather than letting the distinction slide.
 
 - **The posting is untrusted input.** It is pasted from a job board, nobody reads all of it, and it
   goes straight into a prompt. The prize for an attacker is the *scores* — talk a judge into
@@ -129,7 +145,7 @@ Three findings it produced:
 ### The stack
 
 Next.js 15 (App Router) · TypeScript · Tailwind · Zustand · LangChain + LangGraph. About 18k lines,
-**262 tests**, with typecheck, tests and build in CI on every push.
+**312 tests**, with typecheck, tests and build in CI on every push.
 
 ```
 app/             one folder per tab, plus api/deepml/ — the only server code in the repo
@@ -140,6 +156,8 @@ lib/retrieve.ts  BM25 with an alias pass. No embeddings: a few hundred short doc
                  written by one person is the size where lexical search wins outright
 lib/fit.ts       the knapsack that fills exactly one page
 lib/gaps.ts      the same question asked of every posting at once
+lib/rephrase.ts  reword a line; refuse anything new in it
+lib/suggest.ts   what to build, with the payoff counted rather than claimed
 lib/untrusted.ts sanitise · fence · bound — the trust boundary
 lib/llm.ts       Claude · ChatGPT · Ollama · any OpenAI-compatible server, from the browser
 lib/eval/        the answer key

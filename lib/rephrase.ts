@@ -39,6 +39,32 @@ const bare = (s: string) => s.replace(/\*\*/g, "");
 const trim = (t: string) => t.replace(/^[^\w%+#]+|[^\w%+#]+$/g, "");
 
 /**
+ * Ordinary words that are nevertheless claims.
+ *
+ * The five shape rules below catch anything that *looks* like a fact — a digit,
+ * a capital, a dotted name. They are blind to the claims English writes in
+ * plain lowercase, which are the ones that actually get caught in a room:
+ * "contributed to" becoming "led", "improved" becoming "doubled", "worked on"
+ * becoming "owned". Those are the résumé lies with consequences, and they are
+ * invisible to a rule about capital letters.
+ *
+ * The list is deliberately short and covers three things only — magnitude,
+ * primacy, and seniority. Ordinary verbs a rewrite must be free to use
+ * (`designed`, `built`, `wrote`, `shipped`) are not here, because a guard that
+ * refuses every rewrite is one nobody leaves switched on.
+ */
+export const CLAIMS = new Set([
+  /* magnitude */
+  "doubled", "tripled", "quadrupled", "halved", "eliminated", "eradicated",
+  /* primacy */
+  "first", "sole", "solely", "only", "single-handedly", "singlehandedly",
+  "pioneered", "invented", "founded", "originated",
+  /* seniority and ownership */
+  "led", "lead", "leading", "managed", "headed", "owned", "ownership",
+  "mentored", "supervised", "directed", "architected", "oversaw", "spearheaded",
+]);
+
+/**
  * Tokens carrying something an interviewer could check.
  *
  * Five rules, all deliberately over-eager. A false positive here only makes the
@@ -69,8 +95,9 @@ export function facts(text: string): string[] {
     const innerCap = /^[A-Za-z][a-z]*[A-Z]/.test(w);
     const midCap = i > 0 && /^[A-Z][a-z]+$/.test(w);
     const punct = /[a-zA-Z0-9][.+#_-][a-zA-Z0-9+#]/.test(w);
+    const claim = CLAIMS.has(w.toLowerCase());
 
-    if (digit || allCaps || innerCap || midCap || punct) out.add(w.toLowerCase());
+    if (digit || allCaps || innerCap || midCap || punct || claim) out.add(w.toLowerCase());
   });
 
   return [...out].sort();
@@ -150,8 +177,13 @@ export function check(original: string, rewritten: string, context: string[] = [
     return !!parts?.length && parts.every((t) => licensed.has(t));
   };
 
+  /* a claim of magnitude, primacy or seniority is as dangerous as a number and
+     is licensed the same way: from the original line, or not at all. A tag
+     saying `ml` cannot make you the person who led the team */
+  const originalOnly = (f: string) => /\d/.test(f) || CLAIMS.has(f);
+
   const has = (f: string) =>
-    mine.has(f) || (!/\d/.test(f) && (licensed.has(f) || spelledOut(f)));
+    mine.has(f) || (!originalOnly(f) && (licensed.has(f) || spelledOut(f)));
 
   const after = facts(rewritten);
   const invented = after.filter((f) => !has(f));

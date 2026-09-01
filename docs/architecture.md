@@ -514,30 +514,47 @@ So a template is not a `.tex` string. It is a `.tex` string **plus its own metri
 measured the way the comment in `Preview.tsx` describes** — from compiled PDFs, across three
 densities and three font sizes. Budget for that measurement, and do not ship a template without it.
 
-#### 4. Rewriting bullets · *needs a decision before any code*
+#### 4. Rewriting bullets · *shipped, with one condition still open*
 
-This one contradicts something the project currently promises, in the README, in the guide, in
-`agent.ts`, and in the commit that introduced it:
+This contradicted something the project promised in the README, in the guide, and in `agent.ts`:
 
 > It never drafts a bullet. Every line on the page is one you wrote, because a résumé that says
 > something you did not do is a worse outcome than a résumé with a gap in it.
 
-That is a real position, not an accident, and rewriting is a genuinely useful feature. Both can be
-true — but the promise has to be *changed deliberately and visibly*, not quietly weakened. What that
-costs, concretely:
+That was a real position, not an accident, so the promise was changed deliberately rather than
+quietly weakened. It now reads *never invents a claim* — the wording may move, the facts may not.
 
-- **Provenance on the bullet.** A `Bullet` needs to record that its text was model-drafted and
-  human-approved, the preview needs to say so, and the claim in the docs becomes "every line is one
-  you approved" — which is weaker, and true.
-- **A diff, never an in-place edit.** A rewrite is a proposal shown against the original, applied by
-  a click, undoable. The original text is kept.
-- **A different eval.** `lib/eval/` measures *selection*: did it pick the right lines. Rewriting
-  introduces a failure mode selection cannot have — a rewrite that reads better and says something
-  that is not true. That needs its own answer key, checking factual fidelity against the source
-  bullet, and the current harness cannot be extended to it without a new labelling scheme.
+Three conditions were set here before any code. Two are met.
 
-Until the third of those exists, a rewrite feature is shipping the exact failure the project was
-built to avoid.
+- **Provenance.** ✅ `Variant.rewrites` maps a bullet id to `{ text, at, forApp }`. Scoped to the
+  variant, never to the library, so rewording for a hardware posting cannot change what the ML
+  résumé says; and dated, because months later the question is which sentences you wrote yourself.
+- **A diff, never an in-place edit.** ✅ The proposal is shown against the original and applied by a
+  click. Nothing reaches the database until `Create variant`, the original text is never touched,
+  and a refused rewrite is shown with what it tried to add rather than hidden.
+- **A different eval.** ❌ **Still open, and it is the one that matters.** `lib/eval/` measures
+  selection; a rewrite that reads better and says something untrue is a failure mode selection
+  cannot have. There is no answer key for factual fidelity, and `lib/rephrase.test.ts` is a test
+  suite, not a measurement — it says the guard holds on the cases someone thought of.
+
+What stands in its place is `check()`: a hard invariant rather than a measured rate. The rewrite's
+set of checkable facts must be a subset of what licenses it — numbers and claims of magnitude,
+primacy or seniority from the original line only, tool and product names also from the entry's own
+org, title and tags, and never from the posting. That changes the shape of the risk. The failure
+mode is no longer "sometimes it lies", it is "sometimes it refuses an honest rewrite", which costs a
+suggestion rather than an interview.
+
+It does not close the condition, because **an invariant is only as good as `facts()`**, and the
+first version of `facts()` was wrong in a way this section predicted. It looked for digits, capitals
+and dotted names, and was therefore blind to every claim English writes in plain lowercase:
+`Improved` → `Doubled`, `Contributed to` → `Led`, `Worked on` → `Owned`. All five probes slipped
+through. `CLAIMS` closes those, and the fact that they were found by re-reading this paragraph
+rather than by the tests is the argument for the eval, not against it.
+
+What the eval needs, when it is written: pairs of (original, rewrite) labelled faithful or not, with
+the unfaithful ones drawn from what a helpful model actually produces rather than from what an
+attacker would — the embellishment, not the injection. The metric is the one `check()` cannot report
+about itself: how often a true rewrite is refused, and how often a false one is not.
 
 #### 5. A Chrome extension that fills in application forms · *separate codebase*
 

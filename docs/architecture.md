@@ -65,6 +65,7 @@ flowchart LR
 | Sync | The file, in a cloud-synced folder | Desktop ↔ desktop only |
 | Conflict | Halt and ask | Never merges, never guesses |
 | Server | `app/api/deepml/route.ts` | 60 lines, read-only, no state, no key |
+| Server | `app/api/jd/route.ts` | fetches one job posting from an allowlist of ATS hosts. No state, no key, nothing stored |
 | Tailoring | `lib/agent.ts` → `retrieve.ts` + `pack.ts` | Off by default; keyword-only without a model; the key lives outside `DB` |
 | Model calls | Browser → provider, direct | User's own key and account. No route of ours is in the path |
 
@@ -81,7 +82,7 @@ Five things, roughly in order of how much they hurt.
 without a visit. Someone who logs ten applications from the train and comes back a fortnight later
 finds nothing. This is silent, it looks like a bug in us, and it is currently unmitigated.
 
-**2. One API route costs the whole static story.** `app/api/deepml/route.ts` is the only reason this
+**2. The API routes cost the whole static story.** `app/api/deepml/route.ts` was the first reason this
 project needs a Node runtime at all. Because it exists, the app cannot be built with
 `output: "export"`, which means it cannot go on GitHub Pages, cannot be dropped on any static host,
 and cannot be self-hosted by anyone who isn't comfortable running a Node process. The route earns
@@ -624,7 +625,8 @@ app/
   applications/page.tsx application tracker
   practice/page.tsx     multi-platform practice tracker
   data/page.tsx         profile, tags, backup file, import/export
-  api/deepml/route.ts   the only server code — removed in phase 0
+  api/deepml/route.ts   Deep-ML catalogue proxy — removed in phase 0
+  api/jd/route.ts       fetch one posting; allowlisted hosts only, every redirect re-checked
 components/
   AppShell.tsx          nav, language toggle, theme toggle
   resume/Preview.tsx    page-accurate live preview

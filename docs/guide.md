@@ -105,8 +105,23 @@ without leaving the Resume tab.
 
 ## Tailor
 
-Paste a job description. You get back a proposal for a one-page résumé aimed at it, plus the working
-behind that proposal.
+Paste a job description — or a link to one — and you get back a proposal for a one-page résumé aimed
+at it, plus the working behind that proposal.
+
+**A link is read where it can be.** Paste one from Greenhouse, Lever, Ashby, Workable,
+SmartRecruiters, Recruitee, Breezy, Teamtailor or a few others and the posting is fetched and
+tailored in one step. Everywhere else, paste the text — and it will say which of these it was rather
+than failing vaguely:
+
+- **LinkedIn, Indeed, Glassdoor, 104 and the other aggregators are not read on purpose.** They build
+  their pages with JavaScript and block server-side requests, so allowing them would fetch a login
+  wall and hand it to the matcher as a job advert.
+- **A board that forwards to the company's own careers site stops there.** Only a fixed list of
+  hosts is ever fetched, and a redirect off that list is not followed — so a Greenhouse link for a
+  company that has since moved its board will tell you to paste it instead.
+
+Fetching is a shortcut, never a gate: every posting can be pasted, and a pasted one behaves
+identically. What comes back over the link is treated as exactly as untrusted as what you paste.
 
 What happens, in order: the posting is turned into a list of the capabilities it asks for; your
 bullet library is searched for lines that answer each one; the lines are scored; and then the page is
@@ -118,10 +133,19 @@ up and reports the gap.
 hand with enough patience. "Nothing in your library answers this" is the thing you cannot see by
 looking at your own CV, and it is better to find out now than in the interview.
 
-**Nothing is written until you press `Create variant`.** Up to then this is a suggestion. What you
-get is an ordinary variant — same as one you built by hand, editable on the Resume tab, deletable,
-undoable. Only the typography, margins and header row are inherited from the variant you started
-from; the section list and the ticks are the ones just computed.
+**Nothing is written until you act on it.** Up to then the whole run is a suggestion, rewordings
+included. At the foot of the results, **What now** is the one place that writes anything, and it
+holds the two things a run can leave behind — they are independent, and doing one does not commit
+you to the other:
+
+1. **Make it a résumé you can use.** `Create variant` gives you an ordinary variant, the same as one
+   built by hand: editable on the Resume tab, duplicable later, deletable, undoable. That tab is
+   also where you export `.tex`, open Overleaf or save a PDF. Only the typography, margins and
+   header row are inherited from the variant you started from; the section list and the ticks are
+   the ones just computed.
+2. **Keep the posting with the application.** See below.
+
+The step number turns into a tick once it is done, so a run you only half-filed looks half-filed.
 
 **It never invents a claim.** It selects; it does not draft. A résumé that says something you did not
 do is a worse outcome than a résumé with a gap in it.
@@ -152,10 +176,11 @@ tab already lets you edit any bullet by hand, and a sentence you typed yourself 
 other variant goes on saying what it said. The page counter reads the new wording, so a rewrite two
 words longer shows up as a fuller page rather than a surprise at the bottom of the second one.
 
-**Keep the posting.** Under the results there is a box that files the posting under an application —
-an existing row, or a new one it fills in from the link. Worth doing every time, for two reasons: the
-advert comes down the week they fill the role, and the [Applications](#applications) tab can only read
-back postings that were kept. A link on its own is not enough; nothing here can fetch a job page.
+**Keep the posting.** Step 2 of **What now** files the posting under an application — an existing
+row, or a new one filled in from the link. Worth doing every time, for two reasons: the advert comes
+down the week they fill the role, and the [Applications](#applications) tab can only read back
+postings that were kept. A link on its own is not enough — most job pages cannot be fetched at all,
+and the ones that can stop being fetchable the moment the role is filled.
 
 ### With and without a model
 

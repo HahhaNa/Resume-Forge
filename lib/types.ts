@@ -148,11 +148,12 @@ export interface Application {
   /**
    * The posting itself, as it was pasted. Empty until a tailor run is attached.
    *
-   * Kept rather than re-fetched because it cannot be re-fetched: the app has no
-   * server, a job board will not serve its page to another origin, and reaching
-   * out for it would be the first thing that ever left the browser. A link rots
-   * — the posting is taken down the week they fill the role — so the text is the
-   * only durable record of what was asked for.
+   * Kept rather than re-fetched, because a link is not a durable record of what
+   * was asked for. `api/jd` can fetch a posting from a couple of dozen ATS hosts
+   * at the moment it is pasted, and that is all it can do: the aggregators block
+   * server-side requests, a company that moves its board off its ATS becomes
+   * unreadable, and every advert is taken down the week they fill the role. So
+   * the text is stored when it is in hand — the one moment it is certain to be.
    *
    * It stays untrusted: this is text written by whoever wrote the advert, stored
    * verbatim, and every run puts it back through `sanitise` rather than trusting

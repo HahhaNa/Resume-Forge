@@ -31,12 +31,12 @@ of tick-boxes over that library.
 | **One library, many résumés** | Write a bullet once. Tick it into whichever résumés carry it. There is only ever one copy of the text. |
 | **Real LaTeX output** | The app writes LaTeX and hands you a `.tex` or an [Overleaf](https://www.overleaf.com) link. You never have to read it. |
 | **A page counter that doesn't lie** | The live preview is measured against real LaTeX geometry, so `0.94 / 1` genuinely fits and `1.03 / 1` genuinely spills. |
-| **Tailored to one posting** | Paste a job description. It fills exactly one page with the lines of your own history that answer it — and lists the requirements **nothing** of yours answers. |
+| **Tailored to one posting** | Paste a job description — or a link, on the boards that can be read — and it fills exactly one page with the lines of your own history that answer it, then lists the requirements **nothing** of yours answers. |
 | **Reworded, never invented** | A line can be reworded to speak the posting's language. A guard refuses any rewrite that adds a number, tool or name the original did not have, so the wording moves and the claim does not. |
 | **Gaps across every posting** | Ask that same question of every role you have applied to at once: what you keep failing to answer — and which projects would close the most of it, counted against the applications each would have helped. |
 | **Application tracker** | Paste a job link; company, role and ATS are read from the URL. Each row freezes the résumé you actually sent. |
 | **Practice tracker** | LeetCode, NeetCode, Deep-ML, HDLBits. Cross-referenced against the topics on the jobs you applied to. |
-| **Your data stays yours** | No account, no server, no database. Everything lives in your browser, exportable as one file. |
+| **Your data stays yours** | No account and no database. Your résumé lives in your browser and is exportable as one file; the two server routes fetch public pages and hold nothing. |
 
 It **never invents a claim.** Every fact on the page is one you wrote. A bullet can be reworded to
 match a posting's vocabulary, but nothing is applied until you accept it, and a rewrite that smuggles
@@ -145,10 +145,10 @@ Three findings it produced:
 ### The stack
 
 Next.js 15 (App Router) · TypeScript · Tailwind · Zustand · LangChain + LangGraph. About 18k lines,
-**312 tests**, with typecheck, tests and build in CI on every push.
+**330 tests**, with typecheck, tests and build in CI on every push.
 
 ```
-app/             one folder per tab, plus api/deepml/ — the only server code in the repo
+app/             one folder per tab, plus the two API routes — the only server code here
 components/      AppShell, résumé preview, entry editor, shared UI
 
 lib/agent.ts     the graph above
@@ -156,6 +156,7 @@ lib/retrieve.ts  BM25 with an alias pass. No embeddings: a few hundred short doc
                  written by one person is the size where lexical search wins outright
 lib/fit.ts       the knapsack that fills exactly one page
 lib/gaps.ts      the same question asked of every posting at once
+lib/jd.ts        read a posting off a link, from an allowlist of hosts it may read
 lib/rephrase.ts  reword a line; refuse anything new in it
 lib/suggest.ts   what to build, with the payoff counted rather than claimed
 lib/untrusted.ts sanitise · fence · bound — the trust boundary
@@ -227,15 +228,19 @@ real place to log applications is the next big piece of work; the plan is in
 <details>
 <summary><b>Is my résumé uploaded anywhere?</b></summary>
 
-Not unless you ask for it. By default the app makes one outbound request in its whole life, and only
-if you press `Sync catalogue` on the Practice tab — that fetches Deep-ML's public exercise list and
-sends nothing about you.
+Never. Nothing about you is sent anywhere you did not ask for, and three things leave at all:
 
-The one exception is the Tailor tab, after you have connected a model and switched it on. Then two
-things go to the provider *you* chose, with *your* key, straight from your browser: the job
-description you pasted, and the résumé lines the search shortlisted. Never your applications, your
-notes, who referred you, or your contact details. Your key is kept apart from your résumé data, so it
-is not in any export, backup file or restore point. Pick Ollama and nothing leaves your machine.
+- **`Sync catalogue`** on the Practice tab fetches Deep-ML's public exercise list. It sends nothing
+  about you.
+- **Reading a posting from a link** asks this app's own server to fetch that public job page. It
+  sends the URL you pasted and nothing else — no résumé, no cookies, no key — and stores none of it.
+- **The Tailor tab, once you connect a model and switch it on.** Then two things go to the provider
+  *you* chose, with *your* key, straight from your browser: the job description, and the résumé
+  lines the search shortlisted. Never your applications, your notes, who referred you, or your
+  contact details. Your key is kept apart from your résumé data, so it is not in any export, backup
+  file or restore point. Pick Ollama and nothing leaves your machine.
+
+Your résumé itself is only ever sent in the third case, and only the lines a search already picked.
 </details>
 
 <details>

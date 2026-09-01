@@ -2,54 +2,24 @@
 
 # Resume Forge
 
-**Write each bullet point once. Build a different résumé for every kind of job. Keep track of where you sent them.**
+**A LangGraph agent that reads a job posting, finds the lines of your own history that answer it,
+and fills exactly one page — with an answer key that says how often it is right.**
 
-[**▸ Open the app**](https://resume-forge-blond.vercel.app) · [User guide](docs/guide.md) · [Architecture](docs/architecture.md)
+[The agent](#the-agent) · [The answer key](#the-answer-key) · [The code](#the-code) · [Architecture](docs/architecture.md) · [Open the app](https://resume-forge-blond.vercel.app) · [User guide](docs/guide.md)
 
 Free · open source · no sign-up · nothing leaves your browser unless you connect your own model
 
 </div>
 
-<!--
-  TODO: drop a screenshot of the Resume tab here, e.g.
-  ![Resume Forge](docs/screenshot.png)
-  Don't use _preview_air-1.png — that's a real résumé with real contact details.
--->
-
 ---
 
-## What it does
+## The agent
 
-Most job hunts end up with four résumé files that slowly drift apart. You fix a typo in one and
-forget the others; a company emails back and you can't remember which version they read.
+The data model is one sentence: there is **one library of everything you have ever done**, and each
+résumé is a set of tick-boxes over that library. Tailoring is the question that sits on top of it —
+given a posting, which of those lines answer it, and which of them fit on one page?
 
-Resume Forge keeps **one library of everything you have ever done**, and treats each résumé as a set
-of tick-boxes over that library.
-
-| | |
-|---|---|
-| **One library, many résumés** | Write a bullet once. Tick it into whichever résumés carry it. There is only ever one copy of the text. |
-| **Real LaTeX output** | The app writes LaTeX and hands you a `.tex` or an [Overleaf](https://www.overleaf.com) link. You never have to read it. |
-| **A page counter that doesn't lie** | The live preview is measured against real LaTeX geometry, so `0.94 / 1` genuinely fits and `1.03 / 1` genuinely spills. |
-| **Tailored to one posting** | Paste a job description — or a link, on the boards that can be read — and it fills exactly one page with the lines of your own history that answer it, then lists the requirements **nothing** of yours answers. |
-| **Reworded, never invented** | A line can be reworded to speak the posting's language. A guard refuses any rewrite that adds a number, tool or name the original did not have, so the wording moves and the claim does not. |
-| **Gaps across every posting** | Ask that same question of every role you have applied to at once: what you keep failing to answer — and which projects would close the most of it, counted against the applications each would have helped. |
-| **Application tracker** | Paste a job link; company, role and ATS are read from the URL. Each row freezes the résumé you actually sent. |
-| **Practice tracker** | LeetCode, NeetCode, Deep-ML, HDLBits. Cross-referenced against the topics on the jobs you applied to. |
-| **Your data stays yours** | No account and no database. Your résumé lives in your browser and is exportable as one file; the two server routes fetch public pages and hold nothing. |
-
-It **never invents a claim.** Every fact on the page is one you wrote. A bullet can be reworded to
-match a posting's vocabulary, but nothing is applied until you accept it, and a rewrite that smuggles
-in a number or a tool the original did not have is refused rather than offered.
-
-Tailoring works with no setup at all, matching on keywords. Connect a model — Claude, ChatGPT, or an
-open model on your own machine via Ollama — and it matches on meaning instead.
-
----
-
-## How it works
-
-The Tailor tab is the part worth reading code for.
+`lib/agent.ts` answers it in seven nodes.
 
 ```mermaid
 flowchart LR
@@ -65,7 +35,7 @@ flowchart LR
   widen["<b>widen</b><br/>add the model's own keywords"] --> recall
 ```
 
-Seven nodes, one loop, built on LangGraph. Four things about it are worth a line each:
+Seven nodes, one loop, built on LangGraph. Five things about it are worth a line each:
 
 - **`critique → widen → recall` is what makes it an agent, not a pipeline.** The first search uses
   the posting's own words, so the requirement it cannot answer is exactly the one whose evidence is
@@ -103,12 +73,16 @@ Seven nodes, one loop, built on LangGraph. Four things about it are worth a line
   for one requirement is disbelieved and replaced with lexical scoring, which cannot be talked into
   anything. `lib/injection.test.ts` runs a hostile posting through the real graph.
 
-### It is measured, not asserted
+---
 
-`lib/eval/` is an answer key: five postings' worth of requirements hand-labelled against a fixed
-fifteen-line CV. Each requirement carries the lines that genuinely **are** evidence, and **traps** —
-lines on the same topic that are not. Traps are the half that matters: a matcher that returns
-everything on the right topic scores perfectly on recall and is useless.
+## The answer key
+
+Everything above is a design claim. `lib/eval/` is what checks it — it is measured, not asserted.
+
+Five postings' worth of requirements, hand-labelled against a fixed fifteen-line CV. Each
+requirement carries the lines that genuinely **are** evidence, and **traps** — lines on the same
+topic that are not. Traps are the half that matters: a matcher that returns everything on the right
+topic scores perfectly on recall and is useless.
 
 ```
 case               shortlist    recall   precis.     traps      gaps
@@ -142,15 +116,14 @@ Three findings it produced:
   describe the same work in different words, and the test asserts it *keeps* failing. Deleting it
   would raise the average and hide the one thing a model is actually for.
 
-### The stack
+---
+
+## The code
 
 Next.js 15 (App Router) · TypeScript · Tailwind · Zustand · LangChain + LangGraph. About 18k lines,
 **330 tests**, with typecheck, tests and build in CI on every push.
 
 ```
-app/             one folder per tab, plus the two API routes — the only server code here
-components/      AppShell, résumé preview, entry editor, shared UI
-
 lib/agent.ts     the graph above
 lib/retrieve.ts  BM25 with an alias pass. No embeddings: a few hundred short documents
                  written by one person is the size where lexical search wins outright
@@ -163,6 +136,9 @@ lib/untrusted.ts sanitise · fence · bound — the trust boundary
 lib/llm.ts       Claude · ChatGPT · Ollama · any OpenAI-compatible server, from the browser
 lib/eval/        the answer key
 lib/*.test.ts    the pure half, under test — npm test
+
+app/             one folder per tab, plus the two API routes — the only server code here
+components/      AppShell, résumé preview, entry editor, shared UI
 ```
 
 `lib/resume.ts`'s `resolve()` is the single source of truth: the on-screen preview and the exported
@@ -170,6 +146,42 @@ LaTeX both read from it, so what you see is what compiles.
 
 **The full version — the data model, why there is no backend, what is deliberately *not* built, and
 the plan for mobile and sync — is [docs/architecture.md](docs/architecture.md).**
+
+---
+
+## The app around it
+
+The agent is one tab. The rest of the app is what gives it a library worth searching, and what
+happens to the answer once it has one.
+
+<!--
+  TODO: drop a screenshot of the Resume tab here, e.g.
+  ![Resume Forge](docs/screenshot.png)
+  Don't use _preview_air-1.png — that's a real résumé with real contact details.
+-->
+
+Most job hunts end up with four résumé files that slowly drift apart. You fix a typo in one and
+forget the others; a company emails back and you can't remember which version they read. Resume
+Forge keeps one library and treats each résumé as a selection over it.
+
+| | |
+|---|---|
+| **One library, many résumés** | Write a bullet once. Tick it into whichever résumés carry it. There is only ever one copy of the text. |
+| **Real LaTeX output** | The app writes LaTeX and hands you a `.tex` or an [Overleaf](https://www.overleaf.com) link. You never have to read it. |
+| **A page counter that doesn't lie** | The live preview is measured against real LaTeX geometry, so `0.94 / 1` genuinely fits and `1.03 / 1` genuinely spills. |
+| **Tailored to one posting** | Paste a job description — or a link, on the boards that can be read — and it fills exactly one page with the lines of your own history that answer it, then lists the requirements **nothing** of yours answers. |
+| **Reworded, never invented** | A line can be reworded to speak the posting's language. A guard refuses any rewrite that adds a number, tool or name the original did not have, so the wording moves and the claim does not. |
+| **Gaps across every posting** | Ask that same question of every role you have applied to at once: what you keep failing to answer — and which projects would close the most of it, counted against the applications each would have helped. |
+| **Application tracker** | Paste a job link; company, role and ATS are read from the URL. Each row freezes the résumé you actually sent. |
+| **Practice tracker** | LeetCode, NeetCode, Deep-ML, HDLBits. Cross-referenced against the topics on the jobs you applied to. |
+| **Your data stays yours** | No account and no database. Your résumé lives in your browser and is exportable as one file; the two server routes fetch public pages and hold nothing. |
+
+It **never invents a claim.** Every fact on the page is one you wrote. A bullet can be reworded to
+match a posting's vocabulary, but nothing is applied until you accept it, and a rewrite that smuggles
+in a number or a tool the original did not have is refused rather than offered.
+
+Tailoring works with no setup at all, matching on keywords. Connect a model — Claude, ChatGPT, or an
+open model on your own machine via Ollama — and it matches on meaning instead.
 
 ---
 

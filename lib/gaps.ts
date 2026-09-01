@@ -207,6 +207,31 @@ export interface Fit {
   score: number;
 }
 
+/**
+ * How completely a page answered one posting, as one number.
+ *
+ * Pulled out of `aggregate` so the Tailor tab can show the same figure for the
+ * run it has just done. Two screens computing "how good is this" from the same
+ * data by different arithmetic is how a product ends up arguing with itself.
+ *
+ * A required thing counts twice, as `Fit.score` describes: failing something
+ * the posting called required is not the same as failing something it merely
+ * preferred, and a single ordering has to say which it cares about.
+ */
+export function fitOf(asked: Asked[]): Omit<Fit, "appId" | "company" | "role"> {
+  const musts = asked.filter((x) => x.req.kind === "must");
+  const mustsAnswered = musts.filter((x) => x.answer === "page").length;
+  const answered = asked.filter((x) => x.answer === "page").length;
+  const weight = asked.length + musts.length;
+  return {
+    total: asked.length,
+    answered,
+    musts: musts.length,
+    mustsAnswered,
+    score: weight ? (answered + mustsAnswered) / weight : 0,
+  };
+}
+
 export interface Aggregate {
   /** postings that were read — the denominator for every count below */
   postings: number;
@@ -309,20 +334,7 @@ export function aggregate(runs: PostingRun[]): Aggregate {
 
   const fits = runs
     .map<Fit>((run) => {
-      const musts = run.asked.filter((x) => x.req.kind === "must");
-      const mustsAnswered = musts.filter((x) => x.answer === "page").length;
-      const answered = run.asked.filter((x) => x.answer === "page").length;
-      const weight = run.asked.length + musts.length;
-      return {
-        appId: run.appId,
-        company: run.company,
-        role: run.role,
-        total: run.asked.length,
-        answered,
-        musts: musts.length,
-        mustsAnswered,
-        score: weight ? (answered + mustsAnswered) / weight : 0,
-      };
+      return { appId: run.appId, company: run.company, role: run.role, ...fitOf(run.asked) };
     })
     .sort((a, b) => b.score - a.score || b.total - a.total || a.company.localeCompare(b.company));
 

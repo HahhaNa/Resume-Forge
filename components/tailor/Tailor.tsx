@@ -23,6 +23,7 @@ import { useT } from "@/lib/i18n";
 import { parseJdUrl } from "@/lib/ats";
 import { estimatePages } from "@/lib/fit";
 import { resolve } from "@/lib/resume";
+import { fitOf, summarise } from "@/lib/gaps";
 import { chatModel, loadSettings, ready, saveSettings, type LlmSettings } from "@/lib/llm";
 import { propose, type Proposal } from "@/lib/rephrase";
 import { tailor, type Step, type TailorResult } from "@/lib/agent";
@@ -45,6 +46,9 @@ const ODD: Record<Finding["kind"], "oddHidden" | "oddOverride" | "oddRole" | "od
 
 /** 6300 -> "6.3k" — token counts are for a sense of scale, not an invoice. */
 const short = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+
+/** The same three bands the Applications tab uses, so the colours mean one thing. */
+const fitTone = (n: number) => (n >= 0.7 ? "var(--good)" : n >= 0.4 ? "var(--accent)" : "var(--warn)");
 
 /** Blue while it fits, amber once it is close, red once it has spilled. */
 const fillTone = (fill: number) =>
@@ -195,6 +199,18 @@ export default function Tailor() {
    * The refusals are checked before the request so a board that cannot be read
    * says so immediately rather than after a round trip.
    */
+  /**
+   * How completely this page answers this posting, as one number.
+   *
+   * The same `fitOf` the Applications tab ranks by, so a run that scores 68%
+   * here is the row that says 68% there. Required things count twice: a page
+   * answering every preference and missing a requirement is not a near miss.
+   */
+  const fitScore = useMemo(
+    () => (out ? fitOf(summarise({ id: "", company: "", role: "" }, out).asked) : null),
+    [out]
+  );
+
   const readLink = useCallback(
     async (raw: string, thenRun: boolean) => {
       const dest = jdTarget(raw);
@@ -461,6 +477,17 @@ export default function Tailor() {
               sub={<Bar value={fill} max={1} color={fillTone(fill)} height={6} />}
               accent={fillTone(fill)}
             />
+            {fitScore && (
+              <Stat
+                k={t("fitScore")}
+                v={pct(fitScore.score)}
+                sub={`${fitScore.mustsAnswered}/${fitScore.musts} ${t("requiredAnswered")}`}
+                accent={fitTone(fitScore.score)}
+                subTone={
+                  fitScore.mustsAnswered === fitScore.musts ? "var(--good)" : "var(--warn)"
+                }
+              />
+            )}
             <Stat k={t("chosenLines")} v={out.result.chosen.length} sub={`${out.considered.length} considered`} />
             <Stat
               k={t("requirements")}
@@ -516,7 +543,7 @@ export default function Tailor() {
               </button>
               {made && (
                 <button className="btn btn-sm" onClick={() => router.push("/")}>
-                  →
+                  {t("openInResume")} →
                 </button>
               )}
             </div>
@@ -535,6 +562,18 @@ export default function Tailor() {
                   return (
                     <li key={id} className="flex flex-col gap-1 text-[12px] leading-[1.45]">
                       <div className="flex items-start gap-2">
+                        {/* the state of this line's wording, at a glance: nothing
+                            to do, a proposal waiting, or one you accepted */}
+                        <span
+                          className="mono shrink-0 text-[10px]"
+                          style={{
+                            width: "1ch",
+                            color: using ? "var(--good)" : p ? "var(--accent-ink)" : "var(--faint)",
+                          }}
+                          title={using ? t("rewordUsing") : p ? t("rewordWaiting") : ""}
+                        >
+                          {using ? "✓" : p ? "●" : j.doc.kind === "bullet" && ready(settings) ? "✎" : ""}
+                        </span>
                         <span className="mono tabnum shrink-0 text-[10px]" style={{ color: "var(--accent-ink)" }}>
                           {j.score.toFixed(2)}
                         </span>

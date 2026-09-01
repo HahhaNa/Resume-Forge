@@ -538,14 +538,7 @@ export default function Tailor() {
               <span className="mono text-[10px]" style={{ color: "var(--faint)" }}>
                 {out.result.chosen.length}
               </span>
-              <button className="btn btn-primary btn-sm ml-auto" onClick={create} disabled={!!made}>
-                {made ? t("variantMade") : t("createVariant")}
-              </button>
-              {made && (
-                <button className="btn btn-sm" onClick={() => router.push("/")}>
-                  {t("openInResume")} →
-                </button>
-              )}
+              <span className="rule" />
             </div>
             <p className="mb-2 text-[11.5px] leading-[1.5]" style={{ color: "var(--faint)" }}>
               {ready(settings) ? t("rewordHint") : t("rewordNeedsModel")}
@@ -662,62 +655,112 @@ export default function Tailor() {
             </ul>
           </div>
 
+          {/* One place for everything this run can leave behind.
+              These used to be a button in the list header above and a card of
+              their own further down, which made a single decision — "what do I
+              do with this?" — into two things to find. They are still two
+              independent actions and the numbering says so: a résumé you can
+              send, and a posting the Applications tab can read later. */}
           <div className="card p-3.5">
             <div className="mb-2 flex items-center gap-2.5">
-              <h2 className="text-[13.5px] font-semibold leading-none">{t("keepPosting")}</h2>
+              <h2 className="text-[13.5px] font-semibold leading-none">{t("whatNow")}</h2>
               <span className="rule" />
             </div>
-            <p className="text-[11.5px] leading-[1.5]" style={{ color: "var(--ink2)" }}>
-              {t("keepPostingHint")}
+            <p className="mb-3 text-[11.5px] leading-[1.5]" style={{ color: "var(--ink2)" }}>
+              {t("whatNowHint")}
             </p>
-            <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
-              <div className="min-w-[190px] flex-1">
-                <Select
-                  label={t("attachTo")}
-                  value={fileUnder}
-                  /* picking a different row is a new question — the last
-                     confirmation is no longer about what the button would do */
-                  onChange={(v) => {
-                    setFileUnder(v);
-                    setFiled("");
-                  }}
-                  options={[
-                    { value: "", label: `+ ${t("newApplication")}` },
-                    ...s.db.applications.map((a) => ({
-                      value: a.id,
-                      /* a dot marks the ones already carrying a posting, so
-                         "replace" is never a surprise */
-                      label: `${a.jd ? "· " : ""}${[a.company || "—", a.role].filter(Boolean).join(" · ")}`,
-                    })),
-                  ]}
-                />
+
+            <div className="flex flex-col gap-3.5">
+              {/* --- 1. the résumé --- */}
+              <div className="flex gap-2.5">
+                <span
+                  className="mono mt-[1px] shrink-0 text-[10px]"
+                  style={{ color: made ? "var(--good)" : "var(--faint)" }}
+                >
+                  {made ? "✓" : "1"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12.5px] font-semibold leading-none">{t("stepVariant")}</div>
+                  <p className="mt-1 text-[11.5px] leading-[1.5]" style={{ color: "var(--ink2)" }}>
+                    {t("stepVariantHint")}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button className="btn btn-primary btn-sm" onClick={create} disabled={!!made}>
+                      {made ? t("variantMade") : t("createVariant")}
+                    </button>
+                    {made && (
+                      <button className="btn btn-sm" onClick={() => router.push("/")}>
+                        {t("openInResume")} →
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              {!target && (
-                <>
-                  <div className="min-w-[130px] flex-1">
-                    <Field label={t("company")} value={newCo} onChange={setNewCo} placeholder={guess?.company} />
+
+              {/* --- 2. the posting --- */}
+              <div className="flex gap-2.5">
+                <span
+                  className="mono mt-[1px] shrink-0 text-[10px]"
+                  style={{ color: filed ? "var(--good)" : "var(--faint)" }}
+                >
+                  {filed ? "✓" : "2"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12.5px] font-semibold leading-none">{t("stepPosting")}</div>
+                  <p className="mt-1 text-[11.5px] leading-[1.5]" style={{ color: "var(--ink2)" }}>
+                    {t("keepPostingHint")}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-end gap-2.5">
+                    <div className="min-w-[190px] flex-1">
+                      <Select
+                        label={t("attachTo")}
+                        value={fileUnder}
+                        /* picking a different row is a new question — the last
+                           confirmation is no longer about what the button would do */
+                        onChange={(v) => {
+                          setFileUnder(v);
+                          setFiled("");
+                        }}
+                        options={[
+                          { value: "", label: `+ ${t("newApplication")}` },
+                          ...s.db.applications.map((a) => ({
+                            value: a.id,
+                            /* a dot marks the ones already carrying a posting, so
+                               "replace" is never a surprise */
+                            label: `${a.jd ? "· " : ""}${[a.company || "—", a.role].filter(Boolean).join(" · ")}`,
+                          })),
+                        ]}
+                      />
+                    </div>
+                    {!target && (
+                      <>
+                        <div className="min-w-[130px] flex-1">
+                          <Field label={t("company")} value={newCo} onChange={setNewCo} placeholder={guess?.company} />
+                        </div>
+                        <div className="min-w-[130px] flex-1">
+                          <Field label={t("role")} value={newRole} onChange={setNewRole} placeholder={guess?.role} />
+                        </div>
+                      </>
+                    )}
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={file}
+                      disabled={!!filed || (!target && !co && !role)}
+                    >
+                      {target?.jd ? t("replacePosting") : t("attachPosting")}
+                    </button>
                   </div>
-                  <div className="min-w-[130px] flex-1">
-                    <Field label={t("role")} value={newRole} onChange={setNewRole} placeholder={guess?.role} />
-                  </div>
-                </>
-              )}
-              <button
-                className="btn btn-primary"
-                onClick={file}
-                disabled={!!filed || (!target && !co && !role)}
-              >
-                {target?.jd ? t("replacePosting") : t("attachPosting")}
-              </button>
+                  {filed && (
+                    <div className="mono mt-2 flex items-center gap-2 text-[10.5px]" style={{ color: "var(--good)" }}>
+                      {t("attachedTo")} {filed}
+                      <button className="btn btn-sm btn-mono" onClick={() => router.push("/applications")}>
+                        {t("openApplications")} →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            {filed && (
-              <div className="mono mt-2 flex items-center gap-2 text-[10.5px]" style={{ color: "var(--good)" }}>
-                {t("attachedTo")} {filed}
-                <button className="btn btn-sm btn-mono" onClick={() => router.push("/applications")}>
-                  {t("openApplications")} →
-                </button>
-              </div>
-            )}
           </div>
 
           {out.result.dropped.length > 0 && (

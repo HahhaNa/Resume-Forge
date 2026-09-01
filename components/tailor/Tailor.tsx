@@ -23,9 +23,11 @@ import { useT } from "@/lib/i18n";
 import { parseJdUrl } from "@/lib/ats";
 import { estimatePages } from "@/lib/fit";
 import { resolve } from "@/lib/resume";
-import { loadSettings, ready, saveSettings, type LlmSettings } from "@/lib/llm";
+import { chatModel, loadSettings, ready, saveSettings, type LlmSettings } from "@/lib/llm";
+import { propose, type Proposal } from "@/lib/rephrase";
 import { tailor, type Step, type TailorResult } from "@/lib/agent";
 import { MAX_JD, type Finding } from "@/lib/untrusted";
+import type { Rewrite } from "@/lib/types";
 import { Bar, Field, Select, Stat, TagChips } from "@/components/ui/bits";
 import ModelSettings from "./ModelSettings";
 
@@ -62,6 +64,11 @@ export default function Tailor() {
   const [error, setError] = useState("");
   const [out, setOut] = useState<TailorResult | null>(null);
   const [made, setMade] = useState("");
+  /* proposals live here, not in the database: this tab writes nothing until
+     "Create variant", and a rewording is a proposal like everything else on it */
+  const [props, setProps] = useState<Record<string, Proposal>>({});
+  const [kept, setKept] = useState<Record<string, Rewrite>>({});
+  const [wording, setWording] = useState("");
   /* "" is a new application; otherwise the id of the one to file this under */
   const [fileUnder, setFileUnder] = useState("");
   const [newCo, setNewCo] = useState("");
@@ -84,6 +91,54 @@ export default function Tailor() {
     return m;
   }, [s.db]);
 
+  /**
+   * What each line's own entry already says about it.
+   *
+   * The org, the role title and the tags the user maintains by hand — the terms
+   * the guard in `rephrase.ts` will accept as licensed. The posting is
+   * deliberately not in here: an advert naming a tool must never be what
+   * permits that tool onto a résumé.
+   */
+  const contextById = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const e of s.db.entries)
+      for (const b of e.bullets) m.set(b.id, [e.org, e.title, ...e.tags, ...b.tags].filter(Boolean));
+    return m;
+  }, [s.db]);
+
+  const reword = async (bulletId: string, reqs: number[]) => {
+    if (!out || !ready(settings)) return;
+    setWording(bulletId);
+    setError("");
+    try {
+      const model = await chatModel(settings);
+      const { proposal } = await propose({
+        bulletId,
+        text: textById.get(bulletId) ?? "",
+        requirements: out.requirements,
+        reqs,
+        context: contextById.get(bulletId) ?? [],
+        model,
+        kind: settings.kind,
+      });
+      setProps((p) => ({ ...p, [bulletId]: proposal }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWording("");
+    }
+  };
+
+  const keep = (p: Proposal) => {
+    setKept((k) => ({ ...k, [p.bulletId]: { text: p.rewritten, at: new Date().toISOString() } }));
+    setProps(({ [p.bulletId]: _gone, ...rest }) => rest);
+  };
+
+  const drop = (bulletId: string) => {
+    setKept(({ [bulletId]: _gone, ...rest }) => rest);
+    setProps(({ [bulletId]: _also, ...rest }) => rest);
+  };
+
   const run = async () => {
     if (!jd.trim()) {
       setError(t("reqNeeded"));
@@ -95,6 +150,8 @@ export default function Tailor() {
     setSteps([]);
     setOut(null);
     setMade("");
+    setProps({});
+    setKept({});
     setFiled("");
     saveSettings(settings);
     try {
@@ -133,6 +190,7 @@ export default function Tailor() {
       note: out.requirements.map((r) => r.text).join("; ").slice(0, 300),
       sections: out.result.sections,
       bulletIds: out.result.bulletIds,
+      rewrites: kept,
       from: base.id,
     });
     setMade(id);
@@ -184,7 +242,12 @@ export default function Tailor() {
      number the résumé tab will show once this is created */
   const fill = out
     ? estimatePages(
-        resolve(s.db, { ...base, sections: out.result.sections, bulletIds: out.result.bulletIds }),
+        resolve(s.db, {
+          ...base,
+          sections: out.result.sections,
+          bulletIds: out.result.bulletIds,
+          rewrites: kept,
+        }),
         base
       )
     : 0;
@@ -375,25 +438,106 @@ export default function Tailor() {
                 </button>
               )}
             </div>
-            <ul className="flex flex-col gap-1">
+            <p className="mb-2 text-[11.5px] leading-[1.5]" style={{ color: "var(--faint)" }}>
+              {ready(settings) ? t("rewordHint") : t("rewordNeedsModel")}
+            </p>
+            <ul className="flex flex-col gap-1.5">
               {out.judged
                 .filter((j) => out.result.chosen.includes(j.doc.id))
                 .sort((a, b) => b.score - a.score)
-                .map((j) => (
-                  <li key={j.doc.id} className="flex gap-2 text-[12px] leading-[1.45]">
-                    <span className="mono tabnum shrink-0 text-[10px]" style={{ color: "var(--accent-ink)" }}>
-                      {j.score.toFixed(2)}
-                    </span>
-                    <span>
-                      {textById.get(j.doc.id) ?? j.doc.text}
-                      {orgById.get(j.doc.id) && (
-                        <span className="mono ml-1.5 text-[10px]" style={{ color: "var(--faint)" }}>
-                          {orgById.get(j.doc.id)}
+                .map((j) => {
+                  const id = j.doc.id;
+                  const mine = textById.get(id) ?? j.doc.text;
+                  const using = kept[id];
+                  const p = props[id];
+                  return (
+                    <li key={id} className="flex flex-col gap-1 text-[12px] leading-[1.45]">
+                      <div className="flex items-start gap-2">
+                        <span className="mono tabnum shrink-0 text-[10px]" style={{ color: "var(--accent-ink)" }}>
+                          {j.score.toFixed(2)}
                         </span>
+                        <span className="flex-1">
+                          {using?.text ?? mine}
+                          {orgById.get(id) && (
+                            <span className="mono ml-1.5 text-[10px]" style={{ color: "var(--faint)" }}>
+                              {orgById.get(id)}
+                            </span>
+                          )}
+                          {using && (
+                            <span className="mono ml-1.5 text-[10px]" style={{ color: "var(--accent-ink)" }}>
+                              {t("rewordUsing")}
+                            </span>
+                          )}
+                        </span>
+                        {j.doc.kind === "bullet" &&
+                          ready(settings) &&
+                          (using ? (
+                            <button className="btn btn-sm shrink-0" onClick={() => drop(id)}>
+                              {t("rewordUndo")}
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-sm shrink-0"
+                              disabled={!!wording}
+                              onClick={() => reword(id, j.reqs)}
+                            >
+                              {wording === id ? t("rewording") : t("reword")}
+                            </button>
+                          ))}
+                      </div>
+
+                      {/* A proposal, with whatever the guard made of it. A refused
+                          rewrite is shown rather than hidden — knowing the model
+                          tried to add "TensorRT" is worth more than a blank space,
+                          and there is no "accept anyway" because the hand editor
+                          already exists and a claim you typed is one you have read. */}
+                      {p && !using && (
+                        <div
+                          className="ml-[34px] rounded border-l-2 px-2 py-1.5"
+                          style={{
+                            borderColor: p.check.ok ? "var(--accent)" : "var(--crit)",
+                            background: "var(--surface2, transparent)",
+                          }}
+                        >
+                          {p.check.ok ? (
+                            <>
+                              <div>{p.rewritten}</div>
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <button className="btn btn-primary btn-sm" onClick={() => keep(p)}>
+                                  {t("rewordKeep")}
+                                </button>
+                                <button className="btn btn-sm" onClick={() => drop(id)}>
+                                  {t("rewordUndo")}
+                                </button>
+                                <span className="mono text-[10px]" style={{ color: "var(--faint)" }}>
+                                  {p.check.delta > 0
+                                    ? `+${p.check.delta} ${t("rewordLonger")}`
+                                    : `${p.check.delta} ${t("rewordShorter")}`}
+                                  {p.check.borrowed.length > 0 &&
+                                    ` · ${p.check.borrowed.join(", ")} ${t("rewordBorrowed")}`}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-[11.5px]" style={{ color: "var(--crit)" }}>
+                              {p.check.reason === "invented" && (
+                                <>
+                                  {t("rewordInvented")}{" "}
+                                  <span className="mono">{p.check.invented.join(", ")}</span>
+                                </>
+                              )}
+                              {p.check.reason === "unchanged" && t("rewordUnchanged")}
+                              {p.check.reason === "empty" && t("rewordEmpty")}
+                              <button className="btn btn-sm ml-2" onClick={() => drop(id)}>
+                                {t("rewordUndo")}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       )}
-                    </span>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
             </ul>
           </div>
 

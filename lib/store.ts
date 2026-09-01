@@ -23,6 +23,7 @@ import type {
   Problem,
   Profile,
   RestorePoint,
+  Rewrite,
   SkillGroup,
   UndoStep,
   Variant,
@@ -84,6 +85,8 @@ interface Store extends UI {
     note: string;
     sections: VariantSection[];
     bulletIds: string[];
+    /** rewordings accepted during the run that produced this variant */
+    rewrites?: Record<string, Rewrite>;
     /** typography and header are inherited from this variant, never invented */
     from?: string;
   }) => string;
@@ -462,7 +465,7 @@ export const useStore = create<Store>()(
        * from. Only the typography and the header follow the variant it was
        * derived from; the sections and ticks are the packer's.
        */
-      addTailoredVariant: ({ name, label, note, sections, bulletIds, from }) => {
+      addTailoredVariant: ({ name, label, note, sections, bulletIds, rewrites, from }) => {
         const id = uid("v");
         const src = get().db.variants.find((v) => v.id === from) ?? get().db.variants[0];
         const v: Variant = {
@@ -472,6 +475,7 @@ export const useStore = create<Store>()(
           note,
           sections,
           bulletIds,
+          ...(rewrites && Object.keys(rewrites).length ? { rewrites } : {}),
           header: src?.header ?? { phone: true, linkedin: true, github: true, site: false },
           contact: src?.contact,
           linkStyle: src?.linkStyle,

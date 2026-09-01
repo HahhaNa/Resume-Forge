@@ -54,6 +54,18 @@ export const ALLOWED: RegExp[] = [
 export type Refusal = "not-a-url" | "not-https" | "not-allowed";
 
 /**
+ * Everything that can stop a fetch, including what only the server finds out.
+ *
+ * `redirected` is its own reason because it is a different situation with
+ * different advice, and folding it into `not-allowed` produces a message that
+ * is simply untrue. A Greenhouse link is on the list; a company that has moved
+ * its board to its own careers site sends you off it on the second hop, and
+ * telling that user "Greenhouse cannot be read" is wrong about the one fact
+ * they can check.
+ */
+export type Reason = Refusal | "redirected" | "unreachable" | "blocked" | "empty";
+
+/**
  * The URL to fetch, or the reason there is not one.
  *
  * Parsing is the check: a string that `URL` will not take is not a URL, and one
@@ -124,7 +136,7 @@ export interface Fetched {
 }
 
 export class JdError extends Error {
-  constructor(readonly reason: Refusal | "unreachable" | "blocked" | "empty") {
+  constructor(readonly reason: Reason) {
     super(reason);
   }
 }
@@ -142,7 +154,7 @@ export async function fetchJd(raw: string): Promise<Fetched> {
   const res = await fetch(`/api/jd?u=${encodeURIComponent(t.url.toString())}`);
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { reason?: string };
-    throw new JdError((body.reason as JdError["reason"]) ?? "unreachable");
+    throw new JdError((body.reason as Reason) ?? "unreachable");
   }
   const body = (await res.json()) as Fetched;
   if (!body.text?.trim()) throw new JdError("empty");

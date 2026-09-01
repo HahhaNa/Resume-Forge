@@ -63,7 +63,10 @@ export async function GET(req: Request) {
       /* every hop is re-checked: an allowlist that only reads the first URL is
          a suggestion, and a 302 is how you get past a suggestion */
       const hopped = target(new URL(next, url).toString());
-      if ("refusal" in hopped) return fail("not-allowed", 400);
+      /* its own reason: the host the user gave *was* on the list, and a company
+         that has moved its board to its own careers site is a different thing
+         to tell them about than a board that was never readable */
+      if ("refusal" in hopped) return fail("redirected", 400);
       url = hopped.url;
       res = null;
     }

@@ -16,7 +16,7 @@
  * then this is a proposal.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useT } from "@/lib/i18n";
@@ -27,6 +27,7 @@ import { chatModel, loadSettings, ready, saveSettings, type LlmSettings } from "
 import { propose, type Proposal } from "@/lib/rephrase";
 import { tailor, type Step, type TailorResult } from "@/lib/agent";
 import { MAX_JD, type Finding } from "@/lib/untrusted";
+import { fetchJd, target as jdTarget, JdError } from "@/lib/jd";
 import type { Rewrite } from "@/lib/types";
 import { Bar, Field, Select, Stat, TagChips } from "@/components/ui/bits";
 import ModelSettings from "./ModelSettings";
@@ -69,6 +70,11 @@ export default function Tailor() {
   const [props, setProps] = useState<Record<string, Proposal>>({});
   const [kept, setKept] = useState<Record<string, Rewrite>>({});
   const [wording, setWording] = useState("");
+  const [reading, setReading] = useState(false);
+  const [readFrom, setReadFrom] = useState("");
+  /* a link is read once. Without this, editing the box after a read would
+     re-fetch on the next keystroke that happened to leave it valid again */
+  const readTried = useRef("");
   /* "" is a new application; otherwise the id of the one to file this under */
   const [fileUnder, setFileUnder] = useState("");
   const [newCo, setNewCo] = useState("");
@@ -139,8 +145,10 @@ export default function Tailor() {
     setProps(({ [bulletId]: _also, ...rest }) => rest);
   };
 
-  const run = async () => {
-    if (!jd.trim()) {
+  /* takes the posting rather than reading it off state: a link that has just
+     been fetched has not reached `jd` yet when the run starts */
+  const runWith = async (posting: string) => {
+    if (!posting.trim()) {
       setError(t("reqNeeded"));
       return;
     }
@@ -158,7 +166,7 @@ export default function Tailor() {
       const res = await tailor({
         db: s.db,
         base,
-        jd,
+        jd: posting,
         settings,
         tags,
         /* a degree is a fact, not a claim that has to earn its line */
@@ -176,6 +184,61 @@ export default function Tailor() {
       setBusy(false);
     }
   };
+
+  const run = () => void runWith(jd);
+
+  /**
+   * Read the posting behind a link, then tailor to it.
+   *
+   * One action, because pasting a link and then pressing a button that says
+   * "go" is two steps for a decision the user already made when they pasted it.
+   * The refusals are checked before the request so a board that cannot be read
+   * says so immediately rather than after a round trip.
+   */
+  const readLink = useCallback(
+    async (raw: string, thenRun: boolean) => {
+      const dest = jdTarget(raw);
+      if ("refusal" in dest) {
+        setError(
+          dest.refusal === "not-a-url"
+            ? t("jdNotUrl")
+            : dest.refusal === "not-https"
+              ? t("jdNotHttps")
+              : t("jdNotAllowed")
+        );
+        return;
+      }
+      setReading(true);
+      setError("");
+      setReadFrom("");
+      try {
+        const got = await fetchJd(raw);
+        setJd(got.text);
+        setReadFrom(got.from);
+        if (thenRun) void runWith(got.text);
+      } catch (e) {
+        const reason = e instanceof JdError ? e.reason : "unreachable";
+        const key = { "not-a-url": "jdNotUrl", "not-https": "jdNotHttps", "not-allowed": "jdNotAllowed",
+          redirected: "jdRedirected", blocked: "jdBlocked", empty: "jdEmpty",
+          unreachable: "jdUnreachable" } as const;
+        setError(t(key[reason] ?? "jdUnreachable"));
+      } finally {
+        setReading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t]
+  );
+
+  /* a link that can be read is read as soon as it is whole, and only once */
+  useEffect(() => {
+    const raw = url.trim();
+    if (!raw || jd.trim() || readTried.current === raw) return;
+    if ("refusal" in jdTarget(raw)) return;
+    readTried.current = raw;
+    const id = setTimeout(() => void readLink(raw, true), 400);
+    return () => clearTimeout(id);
+  }, [url, jd, readLink]);
 
   const create = () => {
     if (!out || !base) return;
@@ -274,12 +337,31 @@ export default function Tailor() {
       )}
 
       <div className="card p-3.5">
-        <Field label={t("jdUrl")} value={url} onChange={setUrl} type="url" placeholder="https://…" />
-        {guess && (guess.company || guess.role || guess.portal) && (
-          <div className="mono mt-1 text-[10px]" style={{ color: "var(--muted)" }}>
-            {[guess.company, guess.role, guess.portal || guess.source].filter(Boolean).join(" · ")}
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Field label={t("jdUrl")} value={url} onChange={setUrl} type="url" placeholder="https://…" />
           </div>
-        )}
+          <button
+            className="btn btn-sm shrink-0"
+            onClick={() => void readLink(url, !jd.trim())}
+            disabled={reading || !url.trim()}
+          >
+            {reading ? t("reading") : t("readIt")}
+          </button>
+        </div>
+        <div className="mono mt-1 flex flex-wrap items-center gap-x-2 text-[10px]" style={{ color: "var(--muted)" }}>
+          {guess && (guess.company || guess.role || guess.portal) && (
+            <span>{[guess.company, guess.role, guess.portal || guess.source].filter(Boolean).join(" · ")}</span>
+          )}
+          {readFrom && (
+            <span style={{ color: "var(--good)" }}>
+              ✓ {t("readFrom")} {readFrom}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-[11px] leading-[1.45]" style={{ color: "var(--faint)" }}>
+          {t("readHint")}
+        </p>
 
         <div className="mt-2.5">
           <Field

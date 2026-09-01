@@ -127,6 +127,11 @@ from; the section list and the ticks are the ones just computed.
 does not draft. A résumé that claims something you did not do is a worse outcome than a résumé with a
 gap in it.
 
+**Keep the posting.** Under the results there is a box that files the posting under an application —
+an existing row, or a new one it fills in from the link. Worth doing every time, for two reasons: the
+advert comes down the week they fill the role, and the [Applications](#applications) tab can only read
+back postings that were kept. A link on its own is not enough; nothing here can fetch a job page.
+
 ### With and without a model
 
 The tab works with nothing connected. It matches on keywords, and it is honest about it: the banner
@@ -188,6 +193,33 @@ The funnel, the response rate, and the per-variant comparison are computed from 
 you have twenty applications you can see whether `hw` or `ml` is actually getting callbacks.
 
 `Prep topics` on an application feeds the [Practice](#practice) tab.
+
+### What every posting keeps asking for
+
+At the foot of the tab is the one thing the Tailor tab cannot do on its own: **Read every posting**
+takes every application with a posting filed against it, tailors your résumé to each in turn, and
+adds the results up. A blue dot beside a company name means that row has a posting to read.
+
+Two lists come out.
+
+**What goes unanswered** is the useful one — it is the list of what to go and build. Requirements are
+folded together first, so three companies asking for "CUDA kernels", "GPU performance work" and
+"experience writing CUDA" count as one thing asked three times rather than three things asked once.
+Each row separates two counts that look alike and are not:
+
+- *nothing you have written answers it* — a real hole. This is the build-next list.
+- *answered in your library, but it did not fit the page* — you have the line; the page was full. A
+  shorter variant or a two-page target fixes it, and writing something new does not.
+
+**Roles you already answer** ranks the postings by how much of each one your page actually answered,
+counting a required item twice, measured against the résumé that row records — what you actually
+sent, not a variant chosen for the report.
+
+It costs what it says. Each posting is a full tailoring run, so with a model connected the button
+tells you roughly how many calls it is about to make; results appear one posting at a time and
+**Stop** keeps what has been read so far. With no model connected it runs on keyword matching alone,
+for free, and says so — the folding is weaker that way, because the requirements it has to compare
+are whole sentences lifted out of the advert rather than short capabilities.
 
 ---
 

@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SEED } from "./seed";
-import { looksUntouched, migratePersisted } from "./migrate";
+import { looksUntouched, migratePersisted, SCHEMA_VERSION } from "./migrate";
 import { uid, today } from "./id";
 import {
   addEntryToVariant,
@@ -742,6 +742,7 @@ export const useStore = create<Store>()(
                 source: "",
                 referral: "",
                 jdUrl: "",
+                jd: "",
                 portal: "",
                 nextAction: "",
                 nextActionAt: "",
@@ -956,13 +957,28 @@ export const useStore = create<Store>()(
           return { db: { ...s.db, tags } };
         })),
 
-      importDB: (db) =>
+      /**
+       * A whole database from outside: a JSON export, or a backup file this
+       * browser has decided to adopt.
+       *
+       * It goes through the same migration as data coming out of storage,
+       * because it is the same problem — a file exported by an older release
+       * is an older shape, and it arrives at a running app that will read it
+       * expecting the current one. Every branch of `migratePersisted` is
+       * written to be a no-op on data that already has the field, so the
+       * version the file claims never has to be trusted: an export carries
+       * `db.version`, which nothing has maintained since v1.
+       */
+      importDB: (raw) =>
         set(
-          step("Backup imported", (s) => ({
-            restorePoints: withRestorePoint(s, "Before importing a JSON backup"),
-            db,
-            activeVariantId: db.variants[0]?.id ?? "",
-          }))
+          step("Backup imported", (s) => {
+            const db = (migratePersisted({ db: raw }, 1).db ?? raw) as DB;
+            return {
+              restorePoints: withRestorePoint(s, "Before importing a JSON backup"),
+              db,
+              activeVariantId: db.variants[0]?.id ?? "",
+            };
+          })
         ),
 
       /**
@@ -1165,7 +1181,10 @@ export const useStore = create<Store>()(
     }),
     {
       name: "resume-forge",
-      version: 2,
+      /* one number, defined next to the migration that answers for it — the two
+         drifting apart means either a migration that never runs or one that runs
+         against data it has already been applied to */
+      version: SCHEMA_VERSION,
       /** The undo stacks are per-session; see UndoStep in types.ts. */
       partialize: ({ db, restorePoints, lang, theme, activeVariantId, ownWorkAt }) => ({
         db,

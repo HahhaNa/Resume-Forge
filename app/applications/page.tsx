@@ -7,7 +7,9 @@ import { buildTex } from "@/lib/resume";
 import { parseJdUrl } from "@/lib/ats";
 import { APP_STATUSES, CLOSED, FUNNEL } from "@/lib/types";
 import type { AppStatus, Application } from "@/lib/types";
+import { MAX_JD } from "@/lib/untrusted";
 import { Bar, Dot, Field, hue, hueOf, IconBtn, Modal, Select, Stat } from "@/components/ui/bits";
+import Gaps from "@/components/applications/Gaps";
 
 /* the funnel borrows the four variant hues, so a stage reads the same colour everywhere */
 const STAGE_HUE = ["var(--accent)", "var(--t3)", "var(--t2)", "var(--t4)"];
@@ -272,6 +274,13 @@ export default function ApplicationsPage() {
                       style={{ borderBottom: "1px solid var(--grid)" }}
                     >
                       <td className="px-2 py-2 font-semibold">
+                        {/* the posting itself is kept — this row is one the
+                            analysis at the foot of the page can read */}
+                        {a.jd && (
+                          <span className="mr-1.5 inline-block align-middle" title={t("jdLabel")}>
+                            <Dot color="var(--accent)" size={5} />
+                          </span>
+                        )}
                         {a.jdUrl ? (
                           <a href={a.jdUrl} target="_blank" rel="noreferrer" style={{ color: "var(--accent-ink)" }}>
                             {a.company || "—"}
@@ -360,6 +369,8 @@ export default function ApplicationsPage() {
           </div>
         )}
       </div>
+
+      <Gaps />
 
       <AppModal id={edit} onClose={() => setEdit(null)} />
       <SnapModal id={snap} onClose={() => setSnap(null)} />
@@ -574,6 +585,20 @@ function AppModal({ id, onClose }: { id: string | null; onClose: () => void }) {
           placeholder="graphs, dp, verilog fsm"
         />
         <Field label={t("notes")} value={a.notes} onChange={(v) => p({ notes: v })} textarea />
+        <div>
+          <Field
+            label={t("jdLabel")}
+            value={a.jd}
+            /* the same ceiling `sanitise` applies before any of this is read */
+            onChange={(v) => p({ jd: v.slice(0, MAX_JD) })}
+            textarea
+            rows={5}
+            placeholder={t("jdPlaceholder")}
+          />
+          <div className="mono mt-1 text-[10px]" style={{ color: "var(--faint)" }}>
+            {a.jd ? `${a.jd.length} / ${MAX_JD}` : t("jdKeptHint")}
+          </div>
+        </div>
       </div>
       {a.events.length > 0 && (
         <div className="mono mt-4 flex flex-wrap gap-3 text-[11px]" style={{ color: "var(--muted)" }}>

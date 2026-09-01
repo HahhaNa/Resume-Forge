@@ -25,7 +25,7 @@ import { estimatePages } from "@/lib/fit";
 import { resolve } from "@/lib/resume";
 import { loadSettings, ready, saveSettings, type LlmSettings } from "@/lib/llm";
 import { tailor, type Step, type TailorResult } from "@/lib/agent";
-import type { Finding } from "@/lib/untrusted";
+import { MAX_JD, type Finding } from "@/lib/untrusted";
 import { Bar, Field, Select, Stat, TagChips } from "@/components/ui/bits";
 import ModelSettings from "./ModelSettings";
 
@@ -62,6 +62,11 @@ export default function Tailor() {
   const [error, setError] = useState("");
   const [out, setOut] = useState<TailorResult | null>(null);
   const [made, setMade] = useState("");
+  /* "" is a new application; otherwise the id of the one to file this under */
+  const [fileUnder, setFileUnder] = useState("");
+  const [newCo, setNewCo] = useState("");
+  const [newRole, setNewRole] = useState("");
+  const [filed, setFiled] = useState("");
 
   const guess = useMemo(() => (url.trim() ? parseJdUrl(url) : null), [url]);
   const base = s.db.variants.find((v) => v.id === baseId) ?? s.db.variants.find((v) => v.id === s.activeVariantId) ?? s.db.variants[0];
@@ -90,6 +95,7 @@ export default function Tailor() {
     setSteps([]);
     setOut(null);
     setMade("");
+    setFiled("");
     saveSettings(settings);
     try {
       const res = await tailor({
@@ -130,6 +136,45 @@ export default function Tailor() {
       from: base.id,
     });
     setMade(id);
+  };
+
+  const target = s.db.applications.find((a) => a.id === fileUnder);
+  const co = newCo.trim() || guess?.company || "";
+  const role = newRole.trim() || guess?.role || "";
+
+  /**
+   * File the posting under an application.
+   *
+   * The point of the round trip: a run here is one page for one role and then
+   * it is gone, and the question worth asking — what does every posting I
+   * applied to keep asking for — can only be asked of postings that were kept.
+   * The text is stored, not the link, because the link stops resolving the week
+   * the role is filled and nothing here can fetch it back.
+   */
+  const file = () => {
+    /* `sanitise` truncates here anyway — beyond it would be storing bytes
+       nothing will ever read */
+    const text = jd.slice(0, MAX_JD);
+    if (target) {
+      s.patchApplication(target.id, {
+        jd: text,
+        ...(url.trim() && !target.jdUrl ? { jdUrl: url.trim() } : {}),
+      });
+      setFiled([target.company, target.role].filter(Boolean).join(" · ") || t("newApplication"));
+      return;
+    }
+    s.addApplication({
+      company: co,
+      role,
+      jd: text,
+      jdUrl: url.trim(),
+      portal: guess?.portal ?? "",
+      source: guess?.source ?? "",
+      /* the variant this run just produced, when there is one — it is the
+         résumé this posting would actually be answered with */
+      variantId: made || base?.id || s.activeVariantId,
+    });
+    setFiled([co, role].filter(Boolean).join(" · ") || t("newApplication"));
   };
 
   if (!s.hydrated)
@@ -350,6 +395,64 @@ export default function Tailor() {
                   </li>
                 ))}
             </ul>
+          </div>
+
+          <div className="card p-3.5">
+            <div className="mb-2 flex items-center gap-2.5">
+              <h2 className="text-[13.5px] font-semibold leading-none">{t("keepPosting")}</h2>
+              <span className="rule" />
+            </div>
+            <p className="text-[11.5px] leading-[1.5]" style={{ color: "var(--ink2)" }}>
+              {t("keepPostingHint")}
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
+              <div className="min-w-[190px] flex-1">
+                <Select
+                  label={t("attachTo")}
+                  value={fileUnder}
+                  /* picking a different row is a new question — the last
+                     confirmation is no longer about what the button would do */
+                  onChange={(v) => {
+                    setFileUnder(v);
+                    setFiled("");
+                  }}
+                  options={[
+                    { value: "", label: `+ ${t("newApplication")}` },
+                    ...s.db.applications.map((a) => ({
+                      value: a.id,
+                      /* a dot marks the ones already carrying a posting, so
+                         "replace" is never a surprise */
+                      label: `${a.jd ? "· " : ""}${[a.company || "—", a.role].filter(Boolean).join(" · ")}`,
+                    })),
+                  ]}
+                />
+              </div>
+              {!target && (
+                <>
+                  <div className="min-w-[130px] flex-1">
+                    <Field label={t("company")} value={newCo} onChange={setNewCo} placeholder={guess?.company} />
+                  </div>
+                  <div className="min-w-[130px] flex-1">
+                    <Field label={t("role")} value={newRole} onChange={setNewRole} placeholder={guess?.role} />
+                  </div>
+                </>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={file}
+                disabled={!!filed || (!target && !co && !role)}
+              >
+                {target?.jd ? t("replacePosting") : t("attachPosting")}
+              </button>
+            </div>
+            {filed && (
+              <div className="mono mt-2 flex items-center gap-2 text-[10.5px]" style={{ color: "var(--good)" }}>
+                {t("attachedTo")} {filed}
+                <button className="btn btn-sm btn-mono" onClick={() => router.push("/applications")}>
+                  {t("openApplications")} →
+                </button>
+              </div>
+            )}
           </div>
 
           {out.result.dropped.length > 0 && (

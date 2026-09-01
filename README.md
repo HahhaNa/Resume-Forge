@@ -203,6 +203,12 @@ with them — then shows its working: which of your bullets answers which requir
 requirements **nothing** in your library answers. That last list is the useful one. It never writes
 a bullet for you; every line on the page is one you wrote.
 
+**And the same question asked of every posting at once.** File a posting under the application you
+sent it to, and the Applications tab will read all of them together: which requirements keep coming
+back with nothing of yours answering them — the list of what to go and build — and which roles your
+résumé already answers. It separates "you have never written anything about this" from "you have,
+and it did not fit on the page", because those need opposite things done about them.
+
 This works with no setup at all, matching on keywords. Connect a model — Claude, ChatGPT, or an open
 model running on your own machine through Ollama — and it matches on meaning instead. Your key, your
 account, straight from your browser; see the FAQ for exactly what gets sent.

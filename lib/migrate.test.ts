@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { looksUntouched, migratePersisted } from "./migrate";
+import { looksUntouched, migratePersisted, SCHEMA_VERSION } from "./migrate";
 import { SEED } from "./seed";
-import type { DB } from "./types";
+import type { Application, DB } from "./types";
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
@@ -63,6 +63,55 @@ describe("migratePersisted v1 -> v2", () => {
   });
 });
 
+const blankApp = (): Application =>
+  ({ id: "", company: "", role: "", status: "saved", jdUrl: "", jd: "", events: [] }) as unknown as Application;
+
+/** A v2 database: applications with a link to the posting but not the posting. */
+function v2(): DB {
+  const db = clone(SEED) as DB;
+  db.applications = [
+    { ...blankApp(), id: "a1", company: "Acme", jdUrl: "https://boards.greenhouse.io/acme/jobs/1" },
+    { ...blankApp(), id: "a2", company: "Globex" },
+  ];
+  for (const a of db.applications) delete (a as Partial<Application>).jd;
+  return db;
+}
+
+describe("migratePersisted v2 -> v3", () => {
+  it("gives every application the posting field it never had", () => {
+    const apps = migratePersisted({ db: v2() }, 2).db!.applications;
+    expect(apps.map((a) => a.jd)).toEqual(["", ""]);
+  });
+
+  it("keeps a posting somebody has already attached", () => {
+    const db = v2();
+    db.applications[0].jd = "We are looking for a CUDA engineer.";
+    expect(migratePersisted({ db }, 2).db!.applications[0].jd).toBe("We are looking for a CUDA engineer.");
+  });
+
+  it("loses nothing else about the application on the way", () => {
+    const before = v2();
+    const after = migratePersisted({ db: clone(before) }, 2).db!;
+    expect(after.applications).toHaveLength(2);
+    expect(after.applications[0].jdUrl).toBe(before.applications[0].jdUrl);
+    expect(after.applications[1].company).toBe("Globex");
+  });
+
+  it("carries a v1 database all the way to v3 in one pass", () => {
+    // an install that skipped a release runs both branches, in order
+    const db = v1();
+    db.applications = [{ ...blankApp(), id: "a1", company: "Acme" }];
+    delete (db.applications[0] as Partial<Application>).jd;
+    const out = migratePersisted({ db }, 1).db!;
+    expect(out.tags.length).toBeGreaterThan(0);
+    expect(out.applications[0].jd).toBe("");
+  });
+
+  it("survives an application list that is not there at all", () => {
+    expect(() => migratePersisted({ db: { entries: [] } as unknown as DB }, 2)).not.toThrow();
+  });
+});
+
 describe("migratePersisted, everything else", () => {
   it("leaves a vocabulary the user already has alone", () => {
     const db = clone(SEED) as DB;
@@ -73,7 +122,16 @@ describe("migratePersisted, everything else", () => {
   it("does not touch state that is already current", () => {
     const db = clone(SEED) as DB;
     const points = [{ id: "rp1", at: "2026-01-01T00:00:00.000Z", label: "x", db }];
-    expect(migratePersisted({ db, restorePoints: points }, 2)).toEqual({ db, restorePoints: points });
+    expect(migratePersisted({ db, restorePoints: points }, SCHEMA_VERSION)).toEqual({ db, restorePoints: points });
+  });
+
+  it("changes nothing about current data, whatever version it is told", () => {
+    // `importDB` leans on this: a JSON export carries a `db.version` nothing
+    // has maintained since v1, so every branch runs against every import and
+    // none of them may do harm to a file that is already current
+    const db = clone(SEED) as DB;
+    db.applications = [{ ...blankApp(), id: "a1", company: "Acme", jd: "we need CUDA" }];
+    expect(migratePersisted({ db: clone(db) }, 1).db).toEqual(db);
   });
 
   it("survives junk instead of throwing on launch", () => {

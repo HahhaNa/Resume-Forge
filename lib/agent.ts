@@ -150,7 +150,7 @@ export interface Usage {
 
 export const NO_USAGE: Usage = { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
-const addUsage = (a: Usage, b: Usage): Usage => ({
+export const addUsage = (a: Usage, b: Usage): Usage => ({
   calls: a.calls + b.calls,
   input: a.input + b.input,
   output: a.output + b.output,

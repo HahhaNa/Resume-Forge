@@ -323,6 +323,44 @@ const dict = {
     tailorFailed: "That did not work",
     reqNeeded: "Paste a posting first.",
     noRequirements: "Nothing in that reads like a requirement. Paste more of the posting — the responsibilities and qualifications, not just the title.",
+
+    /* --- keeping the posting, and reading all of them at once --- */
+    keepPosting: "Keep this posting",
+    keepPostingHint:
+      "Filed against an application, the posting can be read again — which is what lets the Applications tab ask what every role you applied to has in common. The link alone will not do: the advert comes down the week they fill it.",
+    attachTo: "File it under",
+    attachPosting: "Attach posting",
+    replacePosting: "Replace the posting there",
+    attachedTo: "Filed under",
+    jdKeptHint: "Kept here so every posting can be read at once, at the foot of the tab.",
+    openApplications: "Applications",
+
+    acrossTitle: "What every posting keeps asking for",
+    acrossLead:
+      "The Tailor tab answers one posting. This asks all of them at once, and it answers two questions a single run cannot: which requirements keep coming back with nothing on your page for them, and which roles you already answer.",
+    readAll: "Read every posting",
+    readingPosting: "Reading",
+    stopReading: "Stop",
+    noPostings: "No postings kept yet.",
+    noPostingsHint:
+      "Tailor a posting, then file it under the application. Nothing here can read a job link — a posting has to be kept when it is pasted.",
+    postingsRead: "postings read",
+    withoutPosting: "with no posting kept",
+    modelCallsAbout: "about",
+    keepFailing: "What goes unanswered",
+    keepFailingHint:
+      "Ranked by how many postings asked and got nothing back. Only the first count is a reason to go and build something — the second is a page that was already full.",
+    themeMissing: "nothing you have written answers it",
+    themeLibrary: "answered in your library, but it did not fit the page",
+    themeOnPage: "on the page",
+    themesAnswered: "more asks, answered on the page everywhere they came up",
+    moreAsks: "more not shown",
+    alreadyFit: "Roles you already answer",
+    alreadyFitHint:
+      "How much of each posting the tailored page answers, counting a required item twice. Measured against the résumé that application records.",
+    analysisStopped: "Stopped part way — what was read is below.",
+    postingsOdd: "of these postings carry text aimed at the model. Tailor them one at a time to see what.",
+    keywordOnly: "No model connected — this matched on keywords alone.",
   },
   zh: {
     app: "Resume Forge",
@@ -639,6 +677,43 @@ const dict = {
     tailorFailed: "這次沒有成功",
     reqNeeded: "請先貼上職缺敘述。",
     noRequirements: "這段文字裡看不出任何條件。把職缺內容多貼一些 — 要職責與資格那幾段，不是只有職稱。",
+
+    /* --- 留下職缺原文，並且一次讀完 --- */
+    keepPosting: "留下這份職缺",
+    keepPostingHint:
+      "把原文存在某一筆投遞底下，之後才讀得回來 — 投遞頁要問「我投的這些職缺有什麼共同點」，靠的就是它。只留連結不夠：職缺一補上人就被撤掉了。",
+    attachTo: "歸到哪一筆",
+    attachPosting: "存進去",
+    replacePosting: "覆蓋那筆原有的職缺",
+    attachedTo: "已歸到",
+    jdKeptHint: "存在這裡，頁面最下方才能一次把所有職缺讀完。",
+    openApplications: "投遞紀錄",
+
+    acrossTitle: "每份職缺都在要的東西",
+    acrossLead:
+      "「對職缺」一次回答一份職缺。這裡一次問完全部，回答單一次跑不出來的兩件事：哪些條件一再出現、而你的頁面始終答不上；以及哪些職缺其實你已經答得上。",
+    readAll: "讀完所有職缺",
+    readingPosting: "正在讀",
+    stopReading: "停下",
+    noPostings: "還沒有留下任何職缺原文。",
+    noPostingsHint:
+      "先在「對職缺」跑一次，再把原文歸到那筆投遞底下。這裡沒辦法自己去抓職缺連結 — 原文必須在你貼上的當下就留下來。",
+    postingsRead: "份職缺讀過",
+    withoutPosting: "筆沒有留原文",
+    modelCallsAbout: "大約",
+    keepFailing: "始終答不上的",
+    keepFailingHint:
+      "依「幾份職缺問了、而你什麼也答不出」排序。只有第一個數字才是該去補的東西 — 第二個只是頁面已經滿了。",
+    themeMissing: "你寫過的東西裡沒有一句答得上",
+    themeLibrary: "條目庫裡答得上，只是沒排進頁面",
+    themeOnPage: "已在頁面上",
+    themesAnswered: "項不管哪份職缺問，頁面上都答到了",
+    moreAsks: "項沒有列出來",
+    alreadyFit: "你已經答得上的職缺",
+    alreadyFitHint: "每份職缺被頁面答到的比例，必要條件算兩倍。用那筆投遞紀錄的那份履歷來算。",
+    analysisStopped: "中途停下 — 已經讀到的在下面。",
+    postingsOdd: "份職缺裡有針對模型寫的文字。到「對職缺」一份一份跑，才看得到是什麼。",
+    keywordOnly: "沒有連模型 — 這次只用關鍵字比對。",
   },
 } as const;
 

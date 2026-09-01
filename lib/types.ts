@@ -122,6 +122,22 @@ export interface Application {
   source: string;
   referral: string;
   jdUrl: string;
+  /**
+   * The posting itself, as it was pasted. Empty until a tailor run is attached.
+   *
+   * Kept rather than re-fetched because it cannot be re-fetched: the app has no
+   * server, a job board will not serve its page to another origin, and reaching
+   * out for it would be the first thing that ever left the browser. A link rots
+   * — the posting is taken down the week they fill the role — so the text is the
+   * only durable record of what was asked for.
+   *
+   * It stays untrusted: this is text written by whoever wrote the advert, stored
+   * verbatim, and every run puts it back through `sanitise` rather than trusting
+   * that it was cleaned when it arrived. Capped at `MAX_JD`, which is where
+   * `sanitise` would truncate it anyway — storing more would be keeping bytes
+   * nothing will ever read.
+   */
+  jd: string;
   portal: string;
   nextAction: string;
   nextActionAt: string;

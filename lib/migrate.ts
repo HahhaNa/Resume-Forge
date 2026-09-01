@@ -15,7 +15,7 @@ import { SEED } from "./seed";
 import type { DB, RestorePoint } from "./types";
 
 /** Bump on any change to the persisted shape, and add a branch to `migratePersisted`. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** The part of the persisted state a migration is allowed to care about. */
 export interface Persisted {
@@ -30,6 +30,15 @@ export interface Persisted {
  * the data rather than reset to the seed's, because the tags a user invented are
  * spread across their own entries and variants — the seed's four would be a
  * stranger's.
+ *
+ * v2 kept a link to the posting but never the posting. Nothing can recover that
+ * for the applications already filed — the link is all there is, and by the time
+ * anyone looks the advert is usually down. So the field starts empty and fills as
+ * postings are attached from the Tailor tab; the analysis that reads it says how
+ * many applications it could not see rather than pretending the gap is not there.
+ *
+ * The branches are `if`, not `else if`: a browser that skipped a release arrives
+ * with `from` well behind and has to run every step in order.
  */
 export function migratePersisted(persisted: unknown, from: number): Persisted {
   const s = (persisted ?? {}) as Persisted;
@@ -45,6 +54,9 @@ export function migratePersisted(persisted: unknown, from: number): Persisted {
       for (const k of s.db.skills ?? []) for (const x of k.tags) seen.add(x);
       s.db.tags = seen.size ? [...seen] : [...SEED.tags];
     }
+  }
+  if (from < 3) {
+    for (const a of s.db?.applications ?? []) a.jd ??= "";
   }
   return s;
 }

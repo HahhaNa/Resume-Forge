@@ -59,7 +59,7 @@ flowchart LR
 
 | Piece | Where | Notes |
 |---|---|---|
-| Source of truth | `lib/store.ts` → Zustand + `persist` | One `DB` object, `localStorage["resume-forge"]`, schema v2 |
+| Source of truth | `lib/store.ts` → Zustand + `persist` | One `DB` object, `localStorage["resume-forge"]`, schema v3 |
 | Derived output | `lib/resume.ts` `resolve(db, variant)` | Preview and LaTeX both read this — they cannot disagree |
 | Durability | `lib/backup.ts` | Whole blob written to a user-picked file, 1s debounce; handle in IndexedDB |
 | Sync | The file, in a cloud-synced folder | Desktop ↔ desktop only |
@@ -416,7 +416,7 @@ to break.
 | **Now** · an afternoon | Make the backup file **non-optional**: offer it on first run, keep a coloured warning in the header until *something* holds a second copy, and stop being quiet about a week with no export | Uses code that already exists, and closes both genuine desktop loss cases today |
 | **0** · a weekend | Catalogue → static JSON + weekly Action · `output: "export"` · GitHub Pages workflow · README leads with the hosted link | Removes the setup problem entirely; unblocks every static host |
 | **1** · a weekend | Storage port · IndexedDB as source of truth · `storage.persist()` · PWA manifest + service worker · name the unsafe combination out loud | The iOS seven-day case is live right now and completely silent |
-| **2** · ~2 days | Schema v3 timestamps + tombstones · `lib/merge.ts` · file backup merges instead of halting | Must precede any sync, and the migration is cheap now and expensive once there are users |
+| **2** · ~2 days | Schema v4 timestamps + tombstones · `lib/merge.ts` · file backup merges instead of halting | Must precede any sync, and the migration is cheap now and expensive once there are users |
 | **3** · ~1 week | Bottom-nav mobile layout · read-only résumé view · share-sheet export · Web Share Target | The phone becomes genuinely useful, not merely survivable |
 | **4** · ~1 week | Drive / Dropbox app-folder adapter · OAuth in the browser (`drive.file`) · debounced push, merge on focus · a switch that says what leaves the browser | Phone ↔ laptop, and the user can get the file back without us |
 | **5** · later | Worker + KV · WebCrypto seal/open · QR pairing, for anyone who would rather no third party held the bytes · Gist adapter · more résumé templates · a proper docs site | Nice to have, never required |
@@ -429,23 +429,55 @@ something the app insists on. Phase 2 is the one to be careful with — write th
 
 Five things asked for after the Tailor tab landed. Written down here rather than in a tracker
 because four of the five have a trap in them that is not visible from the feature description, and
-the order below is chosen around those traps rather than around what sounds most exciting.
+the order below is chosen around those traps rather than around what sounds most exciting. The first
+has since shipped, and its own two traps are written up with it rather than deleted — they are the
+part worth reading if you touch it.
 
-#### 1. What the applications log already knows · *cheapest, do first*
+#### 1. What the applications log already knows · *shipped*
 
-Run the gap analysis across **every** posting saved in the Applications tab, not one at a time, and
-aggregate: which requirements do you keep failing to answer, across all the roles you actually
+The gap analysis runs across **every** posting kept on the Applications tab, not one at a time, and
+aggregates: which requirements do you keep failing to answer, across all the roles you actually
 applied to? That answers two questions nothing else here can — *what should I build next*, and
-*which roles am I already a fit for* — and the machinery exists: `tailor()` already returns
-per-requirement gaps.
+*which roles am I already a fit for*. `lib/gaps.ts` is the aggregation, `components/applications/Gaps.tsx`
+the screen at the foot of the tab.
 
-**The blocker is a schema field.** `Application` carries `jdUrl` but not the posting's text, and the
-app cannot fetch it (CORS, and it would be the first thing that left the browser). So the posting has
-to be kept when it is pasted, which means a v3 field and a migration, and it means the Tailor tab
-should offer to attach a run to an application rather than being a dead end.
+**The blocker was a schema field**, and it is gone. `Application` now carries `jd` — the posting as
+it was pasted — beside `jdUrl`, arriving with the v2 → v3 migration. It has to be *kept* rather than
+re-fetched: no server, CORS, and reaching for it would be the first thing that ever left the browser;
+a link stops resolving the week the role is filled. The Tailor tab is no longer a dead end either — a
+finished run can be filed under an existing application or a new one, which is the only way that
+field ever fills.
 
-Do this one first. It is the smallest change on the list and the only one that turns the two tabs
-that already exist into something neither is on its own.
+Two things about the result that were not visible from the feature description.
+
+**A gap is not one thing.** `tailor()` calls a requirement a gap when nothing *on the page* answers
+it, which folds together two situations with opposite remedies: nothing you have written answers it
+(go and build something) versus your library answers it and the line lost its place to something
+better (trim the page, or send a different variant). Across twenty postings that difference is the
+entire value of the exercise, so `gaps.ts` reads `judged` alongside `coverage` and keeps three cases
+apart — `page`, `library`, `none`. Only the last is a to-do list.
+
+**Counting requirements verbatim counts nothing.** Three postings asking for "CUDA kernel
+optimisation", "GPU performance work" and "experience writing CUDA" are one thing you keep failing,
+and listing them separately reports only that adverts are written by different people. So near
+identical requirements fold into a theme first, and the count is of *postings* per theme. No model is
+involved: `expand` already folds this domain's synonyms, the comparison is set overlap — half of the
+shorter side, never on a single shared word — and a rule you can read beats a better one you cannot
+check.
+
+Two limits of that rule, both worth knowing before trusting a number it prints. Overlap needs terms,
+so the filler `retrieve.ts` is right to leave in its index has to come out here: BM25 gives a word
+that appears everywhere almost no weight, set overlap gives it the same weight as `kubernetes`, which
+is how "5+ years of Python" and "5+ years of Java" would otherwise become one ask. And the clustering
+is only as good as the requirement texts — with a model connected they are the six-word capabilities
+the schema asks for and they fold well; on the regex fallback they are whole sentences lifted out of
+the advert, and two postings that both want Kubernetes can stay apart on sharing one word out of
+five. It errs that way deliberately: splitting is a duller report, merging wrongly is a false one.
+
+It is a button, not a render. One run per posting is real money and a real wait, so it says roughly
+how many model calls it is about to make *before* spending them, publishes each posting's result as
+it lands, and can be stopped half way — half an answer is worth more than none. With nothing
+connected it runs on retrieval alone, for free, and says so.
 
 #### 2. Reading more résumé formats, and proving it · *foundation for §3*
 
@@ -583,6 +615,7 @@ components/
   resume/CompareVariants.tsx  variant diff
   tailor/Tailor.tsx     paste a posting, read the working, keep the result
   tailor/ModelSettings.tsx  provider, key, model — and what leaves the browser
+  applications/Gaps.tsx every kept posting, read at once
   ui/bits.tsx           shared inputs, bars, modal
 lib/
   *.test.ts             vitest, node environment — the pure modules below
@@ -595,6 +628,7 @@ lib/
   fit.ts                Preview's geometry as arithmetic — how tall, without a DOM
   pack.ts               scores + fit.ts -> exactly one page (knapsack with setup costs)
   retrieve.ts           BM25 over your own bullets; no embeddings, no key, works offline
+  gaps.ts               many postings' runs -> what you keep failing to answer
   agent.ts              the LangGraph loop: read, recall, judge (fan-out), fit, critique
   eval/corpus.ts        a fixed CV to measure against — deliberately not seed.ts
   eval/cases.ts         the answer key: per requirement, what is evidence and what is a trap
@@ -724,6 +758,12 @@ asserts both — that the prefix survives fencing, and that the payload does not
 Findings are reported to the user, never silently swallowed. The system has already refused to follow
 the text; only the person who pasted it can tell whether a posting that tries to give the model orders
 is a broken scraper or a reason not to apply, and they cannot tell if nobody mentions it.
+
+A posting kept on an application does not become trusted by having been stored. It goes into the
+database as it was pasted, capped at `MAX_JD` — where `sanitise` would truncate it anyway — and every
+run puts it back through `sanitise` rather than assuming it was cleaned on the way in. So the
+findings are reported again instead of being spent once on the day it was pasted, and the run across
+every posting says how many of them carried text aimed at the model.
 
 `injection.test.ts` runs a hostile posting through the real graph against a model that obeys it
 completely — repeating the payload into the requirement it emits, and crediting every line if the

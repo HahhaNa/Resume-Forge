@@ -66,6 +66,10 @@ export function contactText(field: ContactField, value: string, style: "full" | 
 
 export function resolve(db: DB, variant: Variant): Resolved {
   const on = new Set(variant.bulletIds);
+  /* a variant may reword a line for itself; the library keeps the original.
+     Everything downstream — the page estimate, the preview, the LaTeX — has to
+     read the same string, so it is resolved once, here */
+  const worded = (b: { id: string; text: string }) => variant.rewrites?.[b.id]?.text || b.text;
   const byId = new Map(db.entries.map((e) => [e.id, e]));
   const skById = new Map(db.skills.map((s) => [s.id, s]));
   const p = db.profile;
@@ -104,7 +108,7 @@ export function resolve(db: DB, variant: Variant): Resolved {
         .map((e) => {
           const bs = (e as Entry).bullets.filter((b) => on.has(b.id));
           bulletCount += bs.length;
-          bs.forEach((b) => (words += b.text.split(/\s+/).length));
+          bs.forEach((b) => (words += worded(b).split(/\s+/).length));
           return {
             id: (e as Entry).id,
             org: (e as Entry).org,
@@ -112,7 +116,7 @@ export function resolve(db: DB, variant: Variant): Resolved {
             location: (e as Entry).location,
             period: (e as Entry).period,
             kind: (e as Entry).kind,
-            bullets: bs.map((b) => ({ id: b.id, text: b.text })),
+            bullets: bs.map((b) => ({ id: b.id, text: worded(b) })),
           };
         });
       return { id: sec.id, title: sec.title, type: "entries" as const, blocks, skills: [] };

@@ -50,6 +50,27 @@ export interface VariantSection {
   ids: string[]; // entry ids or skill-group ids, in render order
 }
 
+/**
+ * One bullet, reworded for one variant.
+ *
+ * Scoped to the variant and never to the library, which is the whole reason
+ * this is a separate record rather than an edit. The product's first promise is
+ * that there is one copy of every line: rewording a bullet so it answers a
+ * hardware posting must not quietly change what the machine-learning résumé
+ * says, and a rewrite that mutated `Bullet.text` would do exactly that.
+ *
+ * `at` and `forApp` are provenance, and they are the point of keeping this at
+ * all rather than just overwriting. Months later the question you actually have
+ * is *which of these sentences did I write myself*, because those are the ones
+ * you have already read a hundred times and the reworded ones are not.
+ */
+export interface Rewrite {
+  text: string;
+  at: string;
+  /** the application whose posting it was aimed at, when there was one */
+  forApp?: string;
+}
+
 export interface Variant {
   id: string;
   name: string; // short slug used in filenames, e.g. "hw"
@@ -63,6 +84,8 @@ export interface Variant {
   contact?: Partial<Record<ContactField, string>>;
   /** Header links render as the full URL, or as a short label. */
   linkStyle?: "full" | "short";
+  /** bullet id -> the wording this variant uses instead of the library's */
+  rewrites?: Record<string, Rewrite>;
   density: "tight" | "normal" | "airy";
   fontSize: 10 | 10.5 | 11;
   pageTarget: 1 | 2;

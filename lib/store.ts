@@ -89,6 +89,10 @@ interface Store extends UI {
   }) => string;
   patchVariant: (id: string, v: Partial<Variant>) => void;
   removeVariant: (id: string) => void;
+  /** reword one bullet for one variant; the library keeps the original */
+  setRewrite: (variantId: string, bulletId: string, text: string, forApp?: string) => void;
+  /** put the library's own wording back */
+  clearRewrite: (variantId: string, bulletId: string) => void;
   toggleBulletInVariant: (variantId: string, bulletId: string) => void;
   setBulletsInVariant: (variantId: string, bulletIds: string[], on: boolean) => void;
   toggleEntryInVariant: (variantId: string, sectionId: string, entryId: string) => void;
@@ -496,6 +500,42 @@ export const useStore = create<Store>()(
             }),
             `variant:${id}:${Object.keys(v).join(",")}`
           )
+        ),
+      setRewrite: (variantId, bulletId, text, forApp) =>
+        set(
+          step(
+            "Bullet reworded",
+            (s) => ({
+              db: {
+                ...s.db,
+                variants: s.db.variants.map((x) =>
+                  x.id === variantId
+                    ? {
+                        ...x,
+                        rewrites: { ...x.rewrites, [bulletId]: { text, at: stamp(), ...(forApp ? { forApp } : {}) } },
+                        updatedAt: stamp(),
+                      }
+                    : x
+                ),
+              },
+            }),
+            /* one undo step per bullet, not per keystroke: accepting a rewrite is
+               a single decision and ⌘Z should put back a single sentence */
+            `rewrite:${variantId}:${bulletId}`
+          )
+        ),
+      clearRewrite: (variantId, bulletId) =>
+        set(
+          step("Rewording reverted", (s) => ({
+            db: {
+              ...s.db,
+              variants: s.db.variants.map((x) => {
+                if (x.id !== variantId || !x.rewrites?.[bulletId]) return x;
+                const { [bulletId]: _gone, ...rest } = x.rewrites;
+                return { ...x, rewrites: rest, updatedAt: stamp() };
+              }),
+            },
+          }))
         ),
       removeVariant: (id) =>
         set(

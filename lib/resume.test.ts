@@ -232,6 +232,54 @@ describe("resolve", () => {
   });
 });
 
+describe("rewrites", () => {
+  /* the reworded text has to reach the preview, the page estimate and the LaTeX
+     from one place, or the counter stops agreeing with what compiles */
+  it("renders the variant's wording instead of the library's", () => {
+    const { db, v } = fixture();
+    v.rewrites = { b1: { text: "Reduced **latency** 40%", at: "2026-01-01T00:00:00.000Z" } };
+    const line = resolve(db, v).sections[1].blocks[0].bullets[0];
+    expect(line.text).toBe("Reduced **latency** 40%");
+  });
+
+  it("leaves the library's own copy alone", () => {
+    const { db, v } = fixture();
+    v.rewrites = { b1: { text: "Reduced latency 40%", at: "2026-01-01T00:00:00.000Z" } };
+    resolve(db, v);
+    const b1 = db.entries.find((e) => e.id === "e-job")!.bullets[0];
+    expect(b1.text).toBe("Cut **latency** by 40%");
+  });
+
+  /* the property the whole variant-scoped design exists for: rewording a line
+     for one posting must not change what every other résumé says */
+  it("does not reach another variant", () => {
+    const { db, v } = fixture();
+    v.rewrites = { b1: { text: "Reduced latency 40%", at: "2026-01-01T00:00:00.000Z" } };
+    const other = variant({ id: "v2", sections: v.sections, bulletIds: ["b1"] });
+    const line = resolve(db, other).sections[1].blocks[0].bullets[0];
+    expect(line.text).toBe("Cut **latency** by 40%");
+  });
+
+  it("counts the reworded words, not the original's", () => {
+    const { db, v } = fixture();
+    const before = resolve(db, v).wordCount;
+    v.rewrites = { b1: { text: "Cut it", at: "2026-01-01T00:00:00.000Z" } };
+    expect(resolve(db, v).wordCount).toBeLessThan(before);
+  });
+
+  it("reaches the exported LaTeX", () => {
+    const { db, v } = fixture();
+    v.rewrites = { b1: { text: "Reduced tail latency", at: "2026-01-01T00:00:00.000Z" } };
+    expect(buildTex(db, v)).toContain("Reduced tail latency");
+  });
+
+  it("falls back to the original when the rewrite is blank", () => {
+    const { db, v } = fixture();
+    v.rewrites = { b1: { text: "", at: "2026-01-01T00:00:00.000Z" } };
+    expect(resolve(db, v).sections[1].blocks[0].bullets[0].text).toBe("Cut **latency** by 40%");
+  });
+});
+
 describe("buildTex", () => {
   it("produces a document with the résumé in it", () => {
     const { db, v } = fixture();

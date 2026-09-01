@@ -184,7 +184,7 @@ function usageOf(raw: unknown): Usage {
  * ------------------------------------------------------------------ */
 
 type Block = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
-type Msg = { role: "system" | "user"; content: string | Block[] };
+export type Msg = { role: "system" | "user"; content: string | Block[] };
 
 /**
  * The system message, marked so the provider will keep it.
@@ -215,7 +215,7 @@ function systemMsg(text: string, kind: ProviderKind): Msg {
  * carries no usage, and without usage the caching above would be a claim rather
  * than a measurement.
  */
-async function structured<T>(
+export async function structured<T>(
   model: BaseChatModel,
   schema: object,
   msgs: Msg[]
